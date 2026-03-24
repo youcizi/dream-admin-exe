@@ -21,7 +21,7 @@ export function setupAuthHandlers(): void {
 
       // Monitor cookies
       const filter = { name: 'admin_token' }
-      
+
       const checkCookies = async (): Promise<void> => {
         try {
           const cookies = await session.defaultSession.cookies.get(filter)

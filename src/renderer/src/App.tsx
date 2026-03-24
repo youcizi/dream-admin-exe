@@ -30,23 +30,23 @@ function App() {
   return (
     <div className="flex flex-col h-screen bg-white text-slate-800 overflow-hidden font-sans">
       <Header />
-      
+
       {!projectInfo ? (
         <EmptyHome onAddProject={() => setIsModalOpen(true)} />
       ) : (
         <div className="flex-1 flex overflow-hidden">
-          <Sidebar 
-            activeModule={activeModule} 
-            setActiveModule={setActiveModule} 
+          <Sidebar
+            activeModule={activeModule}
+            setActiveModule={setActiveModule}
             projectInfo={projectInfo}
           />
           <MainContent activeModule={activeModule} />
         </div>
       )}
 
-      <ProjectModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <ProjectModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         onSuccess={handleAddProjectSuccess}
       />
     </div>

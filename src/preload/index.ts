@@ -4,14 +4,24 @@ import { electronAPI } from '@electron-toolkit/preload'
 // Custom APIs for renderer
 const api = {
   wrangler: {
-    run: (options: { cwd: string; args: string[] }) => electronAPI.ipcRenderer.send('wrangler-run', options),
+    run: (options: { cwd: string; args: string[] }) =>
+      electronAPI.ipcRenderer.send('wrangler-run', options),
     stop: () => electronAPI.ipcRenderer.send('wrangler-stop'),
     sendInput: (input: string) => electronAPI.ipcRenderer.send('wrangler-input', input),
-    onStdout: (callback: (data: string) => void) => electronAPI.ipcRenderer.on('wrangler-stdout', (_event, data) => callback(data)),
-    onStderr: (callback: (data: string) => void) => electronAPI.ipcRenderer.on('wrangler-stderr', (_event, data) => callback(data)),
-    onClose: (callback: (code: number | null) => void) => electronAPI.ipcRenderer.on('wrangler-close', (_event, code) => callback(code)),
-    onError: (callback: (err: string) => void) => electronAPI.ipcRenderer.on('wrangler-error', (_event, err) => callback(err)),
+    onStdout: (callback: (data: string) => void) =>
+      electronAPI.ipcRenderer.on('wrangler-stdout', (_event, data) => callback(data)),
+    onStderr: (callback: (data: string) => void) =>
+      electronAPI.ipcRenderer.on('wrangler-stderr', (_event, data) => callback(data)),
+    onClose: (callback: (code: number | null) => void) =>
+      electronAPI.ipcRenderer.on('wrangler-close', (_event, code) => callback(code)),
+    onError: (callback: (err: string) => void) =>
+      electronAPI.ipcRenderer.on('wrangler-error', (_event, err) => callback(err)),
     scanProjects: (rootPath: string) => electronAPI.ipcRenderer.invoke('scan-projects', rootPath)
+  },
+  project: {
+    openDirectory: () => electronAPI.ipcRenderer.invoke('dialog:openDirectory'),
+    downloadAndExtract: (url: string, destDir: string) =>
+      electronAPI.ipcRenderer.invoke('project:downloadAndExtract', url, destDir)
   },
   crawler: {
     crawl: (url: string) => electronAPI.ipcRenderer.invoke('crawl-url', url)

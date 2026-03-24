@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -6,6 +6,13 @@ import { setupWranglerHandlers } from './wrangler'
 import { setupCrawlerHandlers } from './crawler'
 import { setupAuthHandlers } from './auth'
 import { setupDeployHandlers } from './deploy'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { exec } from 'node:child_process'
+import axios from 'axios'
+import { promisify } from 'node:util'
+
+const execPromise = promisify(exec)
 
 function createWindow(): void {
   // Create the browser window.
@@ -61,6 +68,51 @@ app.whenReady().then(() => {
   setupCrawlerHandlers()
   setupAuthHandlers()
   setupDeployHandlers()
+
+  // Project Management Handlers
+  ipcMain.handle('dialog:openDirectory', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openDirectory']
+    })
+    if (canceled) return null
+    return filePaths[0]
+  })
+
+  ipcMain.handle('project:downloadAndExtract', async (_event, url: string, destDir: string) => {
+    try {
+      if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true })
+      }
+
+      const zipPath = path.join(destDir, 'project_bundle.zip')
+      console.log(`Downloading ${url} to ${zipPath}`)
+
+      const response = await axios({
+        url,
+        method: 'GET',
+        responseType: 'arraybuffer'
+      })
+
+      fs.writeFileSync(zipPath, response.data)
+      console.log('Download complete, extracting...')
+
+      // Windows Expand-Archive via PowerShell
+      const psCommand = `PowerShell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${destDir}' -Force"`
+      await execPromise(psCommand)
+
+      // Clean up zip
+      fs.unlinkSync(zipPath)
+
+      // Find the inner directory (GitHub zip usually has a root folder like repo-name-branch)
+      const contents = fs.readdirSync(destDir)
+      const extractedDir = contents.find((f) => fs.statSync(path.join(destDir, f)).isDirectory())
+
+      return extractedDir ? path.join(destDir, extractedDir) : destDir
+    } catch (error: unknown) {
+      console.error('Download/Extract error:', error)
+      throw error
+    }
+  })
 
   createWindow()
 

@@ -1,15 +1,15 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   --color-primary: #6366f1; /* Indigo 500 */
   --color-primary-dark: #4338ca; /* Indigo 700 */
   --color-primary-light: #818cf8; /* Indigo 400 */
-  
+
   --color-slate-900: #0f172a;
   --color-slate-800: #1e293b;
   --color-slate-500: #64748b;
   --color-emerald-500: #10b981;
-  
+
   --background-bg: #f8fafc;
   --foreground-fg: #0f172a;
 
@@ -17,14 +17,31 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 :root {
   background-color: #f8fafc;
   color: #0f172a;
-  font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family:
+    'Inter',
+    'SF Pro Display',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Open Sans',
+    'Helvetica Neue',
+    sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -78,7 +95,9 @@ body {
 }
 .card-hover:hover {
   transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
 }
 
 .premium-gradient {
@@ -92,8 +111,8 @@ body {
 }
 
 /* Global cursor pointer for interactive elements */
-button, 
-[role="button"],
+button,
+[role='button'],
 .cursor-pointer,
 select,
 a {

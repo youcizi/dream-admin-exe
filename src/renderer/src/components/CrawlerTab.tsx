@@ -1,32 +1,32 @@
-import React, { useState } from 'react';
-import { Globe, Search, Copy, Check, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react'
+import { Globe, Search, Copy, Check, AlertCircle } from 'lucide-react'
 
 const CrawlerTab: React.FC = () => {
-  const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [copied, setCopied] = useState(false);
+  const [url, setUrl] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<any>(null)
+  const [copied, setCopied] = useState(false)
 
   const handleCrawl = async () => {
-    if (!url) return;
-    setLoading(true);
+    if (!url) return
+    setLoading(true)
     try {
-      const res = await window.api.crawler.crawl(url);
-      setResult(res);
+      const res = await window.api.crawler.crawl(url)
+      setResult(res)
     } catch (err) {
-      setResult({ success: false, error: 'Request failed locally' });
+      setResult({ success: false, error: 'Request failed locally' })
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const copyToClipboard = () => {
     if (result?.data?.content) {
-      navigator.clipboard.writeText(result.data.content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      navigator.clipboard.writeText(result.data.content)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
-  };
+  }
 
   return (
     <div className="p-8 max-w-4xl mx-auto h-full overflow-y-auto">
@@ -39,15 +39,15 @@ const CrawlerTab: React.FC = () => {
       </div>
 
       <div className="relative flex gap-2 mb-8 p-1 bg-slate-800/50 rounded-2xl border border-slate-700 focus-within:border-primary/50 transition-colors">
-        <input 
-          type="text" 
+        <input
+          type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://example.com"
           className="flex-1 bg-transparent px-6 py-4 outline-none text-slate-200"
           onKeyDown={(e) => e.key === 'Enter' && handleCrawl()}
         />
-        <button 
+        <button
           onClick={handleCrawl}
           disabled={loading}
           className="bg-primary hover:bg-primary-dark text-white px-8 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
@@ -77,10 +77,12 @@ const CrawlerTab: React.FC = () => {
             <div className="bg-slate-800/40 border border-slate-700 rounded-3xl overflow-hidden shadow-2xl shadow-black/20">
               <div className="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
                 <div>
-                  <h3 className="text-xl font-bold text-slate-100 truncate max-w-md">{result.data.title}</h3>
+                  <h3 className="text-xl font-bold text-slate-100 truncate max-w-md">
+                    {result.data.title}
+                  </h3>
                   <p className="text-sm text-slate-500 truncate mt-1">{result.data.url}</p>
                 </div>
-                <button 
+                <button
                   onClick={copyToClipboard}
                   className="p-3 hover:bg-slate-700/50 rounded-xl text-slate-400 hover:text-primary transition-all active:scale-90"
                   title="复制内容"
@@ -90,13 +92,17 @@ const CrawlerTab: React.FC = () => {
               </div>
               <div className="p-8">
                 <div className="mb-6">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Meta Description</h4>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Meta Description
+                  </h4>
                   <p className="text-slate-300 leading-relaxed italic border-l-2 border-primary/50 pl-4 py-1">
                     {result.data.description || '无描述信息'}
                   </p>
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Parsed Content Snippet</h4>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Parsed Content Snippet
+                  </h4>
                   <div className="bg-slate-900/60 p-6 rounded-2xl font-mono text-sm text-slate-400 whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto border border-slate-800">
                     {result.data.content}
                   </div>
@@ -107,7 +113,7 @@ const CrawlerTab: React.FC = () => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default CrawlerTab;
+export default CrawlerTab
