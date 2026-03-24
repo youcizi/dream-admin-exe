@@ -4,6 +4,8 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { setupWranglerHandlers } from './wrangler'
 import { setupCrawlerHandlers } from './crawler'
+import { setupAuthHandlers } from './auth'
+import { setupDeployHandlers } from './deploy'
 
 function createWindow(): void {
   // Create the browser window.
@@ -57,6 +59,8 @@ app.whenReady().then(() => {
   // Setup custom handlers
   setupWranglerHandlers()
   setupCrawlerHandlers()
+  setupAuthHandlers()
+  setupDeployHandlers()
 
   createWindow()
 

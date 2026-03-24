@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Globe, Zap, Target } from 'lucide-react';
+import { Plus, Globe, Zap, Target, ArrowRight } from 'lucide-react'
 
 interface EmptyHomeProps {
   onAddProject: () => void;
@@ -25,18 +25,27 @@ const EmptyHome: React.FC<EmptyHomeProps> = ({ onAddProject }) => {
           </p>
         </div>
 
-        <button 
-          onClick={onAddProject}
-          className="group relative inline-flex items-center gap-4 px-10 py-6 bg-slate-900 text-white rounded-[2.5rem] font-black text-sm uppercase tracking-widest shadow-2xl shadow-indigo-900/20 transition-all hover:-translate-y-1 hover:bg-slate-800 active:scale-95"
-        >
-          <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center transition-all group-hover:bg-indigo-500 group-hover:rotate-90">
-            <Plus size={24} />
-          </div>
-          <span>新建贸易项目</span>
-          
-          {/* Subtle button glow */}
-          <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-        </button>
+        <div className="flex flex-col items-center gap-6">
+          <button 
+            onClick={onAddProject}
+            className="group relative inline-flex items-center gap-4 px-10 py-6 bg-slate-900 text-white rounded-[2.5rem] font-black text-sm uppercase tracking-widest shadow-2xl shadow-indigo-900/20 transition-all hover:-translate-y-1 hover:bg-slate-800 active:scale-95"
+          >
+            <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center transition-all group-hover:bg-indigo-500 group-hover:rotate-90">
+              <Plus size={24} />
+            </div>
+            <span>新建贸易项目</span>
+            
+            {/* Subtle button glow */}
+            <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+          </button>
+
+          <button 
+            onClick={() => window.api.openDeploy()}
+            className="group flex items-center gap-2 px-4 py-2 bg-indigo-50/50 hover:bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border border-indigo-100/50"
+          >
+            还没有项目？点击部署应用 <ArrowRight size={12} className="transition-transform group-hover:translate-x-1" />
+          </button>
+        </div>
 
         <div className="grid grid-cols-3 gap-6 pt-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-300">
            {[

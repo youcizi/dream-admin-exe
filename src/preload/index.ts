@@ -15,7 +15,11 @@ const api = {
   },
   crawler: {
     crawl: (url: string) => electronAPI.ipcRenderer.invoke('crawl-url', url)
-  }
+  },
+  auth: {
+    openLogin: (url: string) => electronAPI.ipcRenderer.invoke('auth:open-login', url)
+  },
+  openDeploy: () => electronAPI.ipcRenderer.send('window:open-deploy')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -1,30 +1,36 @@
-import React, { useState } from 'react';
-import { X, Globe, ArrowRight, Loader2 } from 'lucide-react';
+import React, { useState } from 'react'
+import { X, Globe, ArrowRight, Loader2 } from 'lucide-react'
 
 interface ProjectModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: (url: string) => void;
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: (url: string, token: string) => void
 }
 
 const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [url, setUrl] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
-  const handleLoad = async () => {
-    if (!url) return;
-    setLoading(true);
+  const handleLoad = async (): Promise<void> => {
+    if (!url) return
+    setLoading(true)
     
-    // Simulate loading/login process
-    // In a real scenario, this might involve an IPC call to valid URL or setup a session
-    setTimeout(() => {
-      setLoading(false);
-      onSuccess(url);
-      onClose();
-    }, 1500);
-  };
+    try {
+      const token = await window.api.auth.openLogin(url)
+      if (token) {
+        onSuccess(url, token)
+        onClose()
+      } else {
+        // Window was closed without capturing token
+        setLoading(false)
+      }
+    } catch (error) {
+      console.error('Login failed:', error)
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
@@ -81,7 +87,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSuccess 
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default ProjectModal;
+export default ProjectModal

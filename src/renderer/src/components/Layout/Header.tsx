@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, User, ChevronDown, Info, HelpCircle, Mail, LogOut, Edit3, Eye, Globe, Zap, Cpu, Activity } from 'lucide-react';
+import { Settings, User, ChevronDown, Info, HelpCircle, Mail, LogOut, Edit3, Eye, Globe, Zap, Cpu, Activity, Rocket } from 'lucide-react'
 
 const Header: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -57,8 +57,11 @@ const Header: React.FC = () => {
                 <div className="px-4 py-2 mb-1 border-b border-slate-50">
                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">系统管理</p>
                 </div>
-                <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-primary transition-colors">
-                  <Info size={16} /> 软件信息
+                <button 
+                  onClick={() => window.api.openDeploy()}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-primary transition-colors"
+                >
+                  <Rocket size={16} /> 应用部署
                 </button>
                 <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-indigo-50 hover:text-primary transition-colors">
                   <Settings size={16} /> 全局配置
