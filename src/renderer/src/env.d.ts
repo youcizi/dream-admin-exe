@@ -31,6 +31,17 @@ interface Window {
         accountId: string,
         resources: { d1Name: string; r2Name: string }
       ) => Promise<{ d1Id: string; r2Name: string }>
+      listResources: (apiToken: string, accountId: string) => Promise<{ d1: any[]; r2: any[]; pages: any[]; workers: any[] }>
+      getPageDomains: (apiToken: string, accountId: string, projectName: string) => Promise<any[]>
+      addPageDomain: (apiToken: string, accountId: string, projectName: string, domain: string) => Promise<any>
+      deletePage: (apiToken: string, accountId: string, projectName: string) => Promise<any>
+      getWorkerDomains: (apiToken: string, accountId: string) => Promise<any[]>
+      addWorkerDomain: (apiToken: string, accountId: string, service: string, hostname: string, zoneId: string) => Promise<any>
+      deleteWorker: (apiToken: string, accountId: string, scriptName: string) => Promise<any>
+      renameD1: (apiToken: string, accountId: string, databaseId: string, name: string) => Promise<any>
+      deleteD1: (apiToken: string, accountId: string, databaseId: string) => Promise<any>
+      deleteR2: (apiToken: string, accountId: string, bucketName: string) => Promise<any>
+      getZones: (apiToken: string, accountId: string) => Promise<any[]>
     }
     openDeploy: () => void
   }

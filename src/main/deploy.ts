@@ -111,4 +111,142 @@ export function setupDeployHandlers(): void {
       }
     }
   )
+
+  ipcMain.handle('cloudflare:listResources', async (_event, apiToken, accountId) => {
+    try {
+      const headers = { Authorization: `Bearer ${apiToken}` }
+      const [d1Res, r2Res, pagesRes, workersRes] = await Promise.all([
+        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database`, {
+          headers
+        }),
+        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets`, {
+          headers
+        }),
+        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`, {
+          headers
+        }),
+        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`, {
+          headers
+        })
+      ])
+
+      return {
+        d1: d1Res.data.result || [],
+        r2: r2Res.data.result?.buckets || [],
+        pages: pagesRes.data.result || [],
+        workers: workersRes.data.result || []
+      }
+    } catch (error: any) {
+      console.error('List resources error:', error.response?.data || error.message)
+      throw error
+    }
+  })
+
+  // Pages Domain Management
+  ipcMain.handle(
+    'cloudflare:getPageDomains',
+    async (_event, apiToken, accountId, projectName) => {
+      const res = await axios.get(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/${projectName}/domains`,
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data.result
+    }
+  )
+
+  ipcMain.handle(
+    'cloudflare:addPageDomain',
+    async (_event, apiToken, accountId, projectName, domain) => {
+      const res = await axios.post(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/${projectName}/domains`,
+        { name: domain },
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data
+    }
+  )
+
+  ipcMain.handle(
+    'cloudflare:deletePage',
+    async (_event, apiToken, accountId, projectName) => {
+      const res = await axios.delete(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/${projectName}`,
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data
+    }
+  )
+
+  // Workers Domain Management
+  ipcMain.handle('cloudflare:getWorkerDomains', async (_event, apiToken, accountId) => {
+    const res = await axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/domains`, {
+      headers: { Authorization: `Bearer ${apiToken}` }
+    })
+    return res.data.result
+  })
+
+  ipcMain.handle(
+    'cloudflare:addWorkerDomain',
+    async (_event, apiToken, accountId, service, hostname, zoneId) => {
+      const res = await axios.put(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/domains`,
+        {
+          environment: 'production',
+          hostname,
+          service,
+          zone_id: zoneId
+        },
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data
+    }
+  )
+
+  ipcMain.handle(
+    'cloudflare:deleteWorker',
+    async (_event, apiToken, accountId, scriptName) => {
+      const res = await axios.delete(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${scriptName}`,
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data
+    }
+  )
+
+  // D1 & R2 Management
+  ipcMain.handle(
+    'cloudflare:renameD1',
+    async (_event, apiToken, accountId, databaseId, name) => {
+      const res = await axios.patch(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}`,
+        { name },
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data
+    }
+  )
+
+  ipcMain.handle('cloudflare:deleteD1', async (_event, apiToken, accountId, databaseId) => {
+    const res = await axios.delete(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}`,
+      { headers: { Authorization: `Bearer ${apiToken}` } }
+    )
+    return res.data
+  })
+
+  ipcMain.handle('cloudflare:deleteR2', async (_event, apiToken, accountId, bucketName) => {
+    const res = await axios.delete(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucketName}`,
+      { headers: { Authorization: `Bearer ${apiToken}` } }
+    )
+    return res.data
+  })
+
+  ipcMain.handle('cloudflare:getZones', async (_event, apiToken, accountId) => {
+    const res = await axios.get(`https://api.cloudflare.com/client/v4/zones`, {
+      params: { 'account.id': accountId },
+      headers: { Authorization: `Bearer ${apiToken}` }
+    })
+    return res.data.result
+  })
 }

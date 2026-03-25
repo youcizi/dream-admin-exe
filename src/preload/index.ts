@@ -37,7 +37,29 @@ const api = {
     verifyToken: (apiToken: string, accountId: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:verifyToken', apiToken, accountId),
     createResources: (apiToken: string, accountId: string, resources: any) =>
-      electronAPI.ipcRenderer.invoke('cloudflare:createResources', apiToken, accountId, resources)
+      electronAPI.ipcRenderer.invoke('cloudflare:createResources', apiToken, accountId, resources),
+    listResources: (apiToken: string, accountId: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:listResources', apiToken, accountId),
+    getPageDomains: (apiToken: string, accountId: string, projectName: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:getPageDomains', apiToken, accountId, projectName),
+    addPageDomain: (apiToken: string, accountId: string, projectName: string, domain: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:addPageDomain', apiToken, accountId, projectName, domain),
+    deletePage: (apiToken: string, accountId: string, projectName: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:deletePage', apiToken, accountId, projectName),
+    getWorkerDomains: (apiToken: string, accountId: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:getWorkerDomains', apiToken, accountId),
+    addWorkerDomain: (apiToken: string, accountId: string, service: string, hostname: string, zoneId: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:addWorkerDomain', apiToken, accountId, service, hostname, zoneId),
+    deleteWorker: (apiToken: string, accountId: string, scriptName: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:deleteWorker', apiToken, accountId, scriptName),
+    renameD1: (apiToken: string, accountId: string, databaseId: string, name: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:renameD1', apiToken, accountId, databaseId, name),
+    deleteD1: (apiToken: string, accountId: string, databaseId: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:deleteD1', apiToken, accountId, databaseId),
+    deleteR2: (apiToken: string, accountId: string, bucketName: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:deleteR2', apiToken, accountId, bucketName),
+    getZones: (apiToken: string, accountId: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:getZones', apiToken, accountId)
   },
   openDeploy: () => electronAPI.ipcRenderer.send('window:open-deploy')
 }

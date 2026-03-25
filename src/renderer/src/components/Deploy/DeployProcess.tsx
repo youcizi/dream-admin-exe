@@ -43,6 +43,24 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack }) => {
   const [deployLogs, setDeployLogs] = useState<string[]>([])
   const [deployStatus, setDeployStatus] = useState<'idle' | 'running' | 'success' | 'failure'>('idle')
   const [deployedUrl, setDeployedUrl] = useState('')
+  const [existingResources, setExistingResources] = useState<{ d1: any[]; r2: any[] }>({
+    d1: [],
+    r2: []
+  })
+
+  const HELP_URL = 'https://soft.ycz.me/help'
+
+  React.useEffect(() => {
+    if (step === 2 && configFields.CF_API_TOKEN && configFields.CF_ACCOUNT_ID) {
+      window.api.cloudflare
+        .listResources(configFields.CF_API_TOKEN, configFields.CF_ACCOUNT_ID)
+        .then(setExistingResources)
+        .catch(console.error)
+    }
+  }, [step, configFields.CF_API_TOKEN, configFields.CF_ACCOUNT_ID])
+
+  const isD1NameConflict = existingResources.d1.some((db) => db.name === configFields.database_name)
+  const isR2NameConflict = existingResources.r2.some((b) => b.name === configFields.bucket_name)
 
   React.useEffect(() => {
     const logsEnd = document.getElementById('logs-end')
@@ -118,13 +136,67 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
         setDeployStatus('failure')
       })
 
-      window.api.wrangler.onClose((code) => {
+      window.api.wrangler.onClose(async (code) => {
         if (code === 0) {
-          setDeployStatus('success')
-          setDeployLogs((prev) => [...prev, '🎉 部署成功！'])
+          setDeployLogs((prev) => [...prev, '代码部署成功，正在准备数据库迁移...'])
+          
+          // 5. Execute Migration if schema.sql exists
+          setDeployLogs((prev) => [...prev, '正在执行数据表写入 (npx wrangler d1 execute DB --file=schema.sql --remote)...'])
+          
+          // We use npx wrangler d1 execute
+          // Note: Since we don't have a direct file existence check, we'll try to run it.
+          // If it fails because schema.sql is missing, the command will exit with non-zero.
+          
+          let migrationSuccess = false;
+          
+          const runMigration = () => {
+             return new Promise<void>((resolve, reject) => {
+                window.api.wrangler.onStdout((data) => {
+                  setDeployLogs((prev) => [...prev, `[DB] ${data}`])
+                })
+                window.api.wrangler.onStderr((data) => {
+                   setDeployLogs((prev) => [...prev, `[DB ERR] ${data}`])
+                })
+                window.api.wrangler.onClose((mCode) => {
+                  if (mCode === 0) {
+                    migrationSuccess = true;
+                    resolve()
+                  } else {
+                    reject(new Error(`数据库迁移失败，退出码: ${mCode}`))
+                  }
+                })
+                window.api.wrangler.run({
+                  cwd: projectInfo.path,
+                  args: ['d1', 'execute', 'DB', '--file=schema.sql', '--remote', '-y']
+                })
+             })
+          }
+
+          try {
+            await runMigration()
+            setDeployStatus('success')
+            setDeployLogs((prev) => [...prev, '🎉 部署完全成功！所有数据表已初始化。'])
+            
+            // 6. Save Deployment History
+            const history = JSON.parse(localStorage.getItem('deploy_history') || '[]')
+            const newEntry = {
+              name: configFields.name,
+              url: deployedUrl,
+              d1Id: resources.d1Id,
+              d1Name: configFields.database_name,
+              r2Name: configFields.bucket_name,
+              timestamp: Date.now()
+            }
+            localStorage.setItem('deploy_history', JSON.stringify([newEntry, ...history]))
+          } catch (mErr: any) {
+            setDeployLogs((prev) => [...prev, `[错误] ${mErr.message || String(mErr)}`])
+            setDeployLogs((prev) => [...prev, `提示: 检查项目目录下是否存在 schema.sql 文件。更多说明请访问: ${HELP_URL}`])
+            setDeployStatus('failure')
+          }
         } else {
           setDeployStatus('failure')
           setDeployLogs((prev) => [...prev, `部署终止，退出码: ${code}`])
+          setDeployLogs((prev) => [...prev, `如有疑问请访问帮助中心: ${HELP_URL}`])
         }
       })
 
@@ -364,8 +436,8 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                   基础项目配置
                 </h3>
 
-                <div className="space-y-4">
-                  <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="col-span-2 space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
                       项目名称 (name)
                     </label>
@@ -378,30 +450,48 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                      数据库名称 (database_name)
-                    </label>
+                    <div className="flex justify-between items-center pl-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        数据库名称 (database)
+                      </label>
+                      {isD1NameConflict && (
+                        <span className="text-[10px] text-amber-500 font-bold animate-pulse">
+                          已有
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="text"
                       value={configFields.database_name}
                       onChange={(e) =>
                         setConfigFields({ ...configFields, database_name: e.target.value })
                       }
-                      className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all"
+                      className={`w-full px-5 py-3 bg-slate-50 border rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all ${
+                        isD1NameConflict ? 'border-amber-200 focus:border-amber-500' : 'border-slate-100'
+                      }`}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                      R2 存储桶 (bucket_name)
-                    </label>
+                    <div className="flex justify-between items-center pl-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        R2 存储桶 (bucket)
+                      </label>
+                      {isR2NameConflict && (
+                        <span className="text-[10px] text-amber-500 font-bold animate-pulse">
+                          已有
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="text"
                       value={configFields.bucket_name}
                       onChange={(e) =>
                         setConfigFields({ ...configFields, bucket_name: e.target.value })
                       }
-                      className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all"
+                      className={`w-full px-5 py-3 bg-slate-50 border rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all ${
+                        isR2NameConflict ? 'border-amber-200 focus:border-amber-500' : 'border-slate-100'
+                      }`}
                     />
                   </div>
                 </div>
@@ -415,10 +505,10 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                   安全与敏感配置
                 </h3>
 
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                      后台验证码 (CF_ADMIN_CAPTCHA)
+                      后台验证码 (CAPTCHA)
                     </label>
                     <div className="flex gap-2">
                       <input
@@ -437,7 +527,6 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                           })
                         }
                         className="p-3 bg-emerald-50 text-emerald-500 rounded-xl hover:bg-emerald-100 transition-colors"
-                        title="自动生成"
                       >
                         <RefreshCw size={18} />
                       </button>
@@ -450,7 +539,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                     </label>
                     <div className="flex gap-2">
                       <input
-                        type="text"
+                        type="password"
                         value={configFields.JWT_SECRET}
                         onChange={(e) =>
                           setConfigFields({ ...configFields, JWT_SECRET: e.target.value })
@@ -465,7 +554,6 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                           })
                         }
                         className="p-3 bg-emerald-50 text-emerald-500 rounded-xl hover:bg-emerald-100 transition-colors"
-                        title="自动生成"
                       >
                         <RefreshCw size={18} />
                       </button>
@@ -474,12 +562,13 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                 </div>
               </div>
 
-              <div className="p-6 bg-indigo-50/50 rounded-[2rem] border border-indigo-100/50">
-                <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
-                  <CheckCircle2 size={12} /> 提示
-                </p>
+              <div className="p-6 bg-indigo-50/50 rounded-[2rem] border border-indigo-100/50 flex items-center gap-4">
+                <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
+                  <CheckCircle2 size={20} />
+                </div>
                 <p className="text-[11px] text-indigo-900/60 font-medium leading-relaxed">
-                  点击“一键部署”后，系统将自动在您的 Cloudflare 账户中创建 D1 数据库和 R2 存储桶，并自动回填 <code>wrangler.toml</code> 配置文件。
+                  系统将自动在您的 Cloudflare 账户中创建或复用资源。
+                  若有疑问，请访查 <a href={HELP_URL} target="_blank" rel="noreferrer" className="text-primary font-black underline">帮助中心</a>。
                 </p>
               </div>
             </div>
