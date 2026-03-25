@@ -147,7 +147,7 @@ const DeployApp: React.FC = () => {
 
   const [isDomainModalOpen, setIsDomainModalOpen] = useState(false)
   const [domainModalTarget, setDomainModalTarget] = useState<{ type: 'page' | 'worker'; name: string } | null>(null)
-  const [targetDomains, setTargetDomains] = useState<string[]>([])
+  const [targetDomains, setTargetDomains] = useState<{ name: string; id?: string }[]>([])
   const [loadingDomains, setLoadingDomains] = useState(false)
   const [newDomain, setNewDomain] = useState('')
 
@@ -160,10 +160,10 @@ const DeployApp: React.FC = () => {
     try {
       if (type === 'page') {
         const domains = await window.api.cloudflare.getPageDomains(config.apiToken, config.accountId, name)
-        setTargetDomains(domains.map((d: any) => d.name))
+        setTargetDomains(domains.map((d: any) => ({ name: d.name })))
       } else {
         const allDomains = await window.api.cloudflare.getWorkerDomains(config.apiToken, config.accountId)
-        setTargetDomains(allDomains.filter((d: any) => d.service === name).map((d: any) => d.hostname))
+        setTargetDomains(allDomains.filter((d: any) => d.service === name).map((d: any) => ({ name: d.hostname, id: d.id })))
       }
     } catch (err) {
       console.error('Failed to fetch domains:', err)
@@ -176,32 +176,79 @@ const DeployApp: React.FC = () => {
     if (!config || !domainModalTarget || !newDomain) return
     setLoadingDomains(true)
     try {
+      let zoneId = ''
       if (domainModalTarget.type === 'page') {
         await window.api.cloudflare.addPageDomain(config.apiToken, config.accountId, domainModalTarget.name, newDomain)
+        // Try to find zone for DNS automation
+        const zones = await window.api.cloudflare.getZones(config.apiToken, config.accountId)
+        const matchingZone = zones.find((z: any) => newDomain.endsWith(z.name))
+        if (matchingZone) zoneId = matchingZone.id
       } else {
-        // For Workers, we need a Zone ID. For simplicity, we try to find a matching zone or ask.
-        // Here we'll fetch zones and try to match the domain suffix.
         const zones = await window.api.cloudflare.getZones(config.apiToken, config.accountId)
         const matchingZone = zones.find((z: any) => newDomain.endsWith(z.name))
         if (!matchingZone) {
           throw new Error('未找到匹配的 Cloudflare Zone，请确保域名已添加到当前账户。')
         }
-        await window.api.cloudflare.addWorkerDomain(config.apiToken, config.accountId, domainModalTarget.name, newDomain, matchingZone.id)
+        zoneId = matchingZone.id
+        await window.api.cloudflare.addWorkerDomain(config.apiToken, config.accountId, domainModalTarget.name, newDomain, zoneId)
+      }
+
+      // Automatically add DNS CNAME record
+      if (zoneId) {
+        try {
+          const content = domainModalTarget.type === 'page' 
+            ? `${domainModalTarget.name}.pages.dev`
+            : `${config.accountId}.workers.dev` // Simplified, may need specific worker subdomain
+          
+          await window.api.cloudflare.createDNSRecord(
+            config.apiToken,
+            zoneId,
+            'CNAME',
+            newDomain,
+            content,
+            true
+          )
+        } catch (dnsErr: any) {
+          console.error('DNS auto-creation failed:', dnsErr)
+          // Don't throw, just warn because the binding might have succeeded
+          alert(`域名绑定成功，但自动添加 DNS 解析失败 (${dnsErr.message || '权限不足'})。请手动配置 CNAME 指向对应平台。更多帮助: https://soft.ycz.me/help`)
+        }
       }
       
       // Refresh domains
       if (domainModalTarget.type === 'page') {
         const domains = await window.api.cloudflare.getPageDomains(config.apiToken, config.accountId, domainModalTarget.name)
-        setTargetDomains(domains.map((d: any) => d.name))
+        setTargetDomains(domains.map((d: any) => ({ name: d.name })))
       } else {
         const allDomains = await window.api.cloudflare.getWorkerDomains(config.apiToken, config.accountId)
-        setTargetDomains(allDomains.filter((d: any) => d.service === domainModalTarget.name).map((d: any) => d.hostname))
+        setTargetDomains(allDomains.filter((d: any) => d.service === domainModalTarget.name).map((d: any) => ({ name: d.hostname, id: d.id })))
       }
       
       setNewDomain('')
       fetchResources()
     } catch (err: any) {
-      alert(`添加域名失败: ${err.message || '请检查域名格式或 Cloudflare 权限。'}`)
+      alert(`添加域名失败: ${err.message || '请检查域名格式或 Cloudflare 权限。'} 更多帮助: https://soft.ycz.me/help`)
+    } finally {
+      setLoadingDomains(false)
+    }
+  }
+
+  const handleDeleteDomain = async (domainName: string, domainId?: string): Promise<void> => {
+    if (!config || !domainModalTarget) return
+    if (!confirm(`确定要删除域名 ${domainName} 的绑定吗？`)) return
+    
+    setLoadingDomains(true)
+    try {
+      if (domainModalTarget.type === 'page') {
+        await window.api.cloudflare.deletePageDomain(config.apiToken, config.accountId, domainModalTarget.name, domainName)
+      } else if (domainId) {
+        await window.api.cloudflare.deleteWorkerDomain(config.apiToken, config.accountId, domainId)
+      }
+      // Refresh
+      handleOpenDomainModal(domainModalTarget.type, domainModalTarget.name)
+      fetchResources()
+    } catch (err: any) {
+      alert(`删除域名失败: ${err.message || '请检查权限。'}`)
     } finally {
       setLoadingDomains(false)
     }
@@ -276,11 +323,11 @@ const DeployApp: React.FC = () => {
             ) : (
               <>
                 {activeTab === 'pages' && config && !resourceError && (
-                  <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6">
-                     <div className="flex items-center justify-between mb-4">
+                  <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10">
+                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <Globe className="text-slate-400" size={20} />
-                          <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Pages 应用列表</h2>
+                           <Globe className="text-slate-400" size={20} />
+                           <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Pages 应用列表</h2>
                         </div>
                         <button onClick={fetchResources} className="p-2 text-slate-400 hover:text-slate-600 transition-colors"><RefreshCw size={16} /></button>
                      </div>
@@ -310,11 +357,11 @@ const DeployApp: React.FC = () => {
                 )}
 
                 {activeTab === 'workers' && config && !resourceError && (
-                  <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6">
-                     <div className="flex items-center justify-between mb-4">
+                  <div className="animate-in fade-in slide-in-from-bottom-4 space-y-10">
+                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <Layers className="text-slate-400" size={20} />
-                          <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Workers 应用列表</h2>
+                           <Layers className="text-slate-400" size={20} />
+                           <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Workers 应用列表</h2>
                         </div>
                         <button onClick={fetchResources} className="p-2 text-slate-400 hover:text-slate-600 transition-colors"><RefreshCw size={16} /></button>
                      </div>
@@ -344,34 +391,34 @@ const DeployApp: React.FC = () => {
                 )}
 
                 {activeTab === 'data' && config && !resourceError && (
-                  <div className="animate-in fade-in slide-in-from-bottom-4 grid grid-cols-1 lg:grid-cols-2 gap-10">
+                  <div className="animate-in fade-in slide-in-from-bottom-4 space-y-12">
                      {/* D1 Databases */}
                      <section>
                         <div className="flex items-center gap-3 mb-6">
                            <Database className="text-slate-400" size={20} />
                            <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">D1 数据库 ({resources.d1.length})</h2>
                         </div>
-                        <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                            {resources.d1.map((db: any) => (
-                              <div key={db.uuid} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm group hover:shadow-md transition-all flex items-center justify-between">
-                                 <div>
-                                    <h4 className="font-bold text-slate-800 mb-0.5">{db.name}</h4>
-                                    <p className="text-[9px] text-slate-400 font-mono tracking-tighter">{db.uuid}</p>
+                              <div key={db.uuid} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm group hover:shadow-md transition-all flex flex-col justify-between">
+                                 <div className="mb-4">
+                                    <h4 className="font-bold text-slate-800 mb-0.5 break-all">{db.name}</h4>
+                                    <p className="text-[9px] text-slate-400 font-mono tracking-tighter opacity-60">{db.uuid}</p>
                                  </div>
-                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                 <div className="flex items-center justify-end gap-2">
                                     <button onClick={async () => {
                                        const newName = prompt('设置新的数据库名称:', db.name)
                                        if (newName && newName !== db.name) {
                                           await window.api.cloudflare.renameD1(config.apiToken, config.accountId, db.uuid, newName)
                                           fetchResources()
                                        }
-                                    }} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-all"><Edit3 size={12} /></button>
+                                    }} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all"><Edit3 size={14} /></button>
                                     <button onClick={async () => {
                                        if (confirm(`确定要彻底删除数据库 ${db.name} 吗？所有数据将丢失！`)) {
                                           await window.api.cloudflare.deleteD1(config.apiToken, config.accountId, db.uuid)
                                           fetchResources()
                                        }
-                                    }} className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-all"><Trash2 size={12} /></button>
+                                    }} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={14} /></button>
                                  </div>
                               </div>
                            ))}
@@ -384,19 +431,21 @@ const DeployApp: React.FC = () => {
                            <Cloud className="text-slate-400" size={20} />
                            <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">R2 存储桶 ({resources.r2.length})</h2>
                         </div>
-                        <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                            {resources.r2.map((bucket: any) => (
-                              <div key={bucket.name} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm group hover:shadow-md transition-all flex items-center justify-between">
-                                 <div>
-                                    <h4 className="font-bold text-slate-800 mb-0.5">{bucket.name}</h4>
-                                    <p className="text-[9px] text-slate-400 font-medium">创建于: {new Date(bucket.creation_date).toLocaleDateString()}</p>
+                              <div key={bucket.name} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm group hover:shadow-md transition-all flex flex-col justify-between">
+                                 <div className="mb-4">
+                                    <h4 className="font-bold text-slate-800 mb-0.5 break-all">{bucket.name}</h4>
+                                    <p className="text-[9px] text-slate-400 font-medium opacity-60">创建于: {new Date(bucket.creation_date).toLocaleDateString()}</p>
                                  </div>
-                                 <button onClick={async () => {
-                                    if (confirm(`确定要删除存储桶 ${bucket.name} 吗？`)) {
-                                       await window.api.cloudflare.deleteR2(config.apiToken, config.accountId, bucket.name)
-                                       fetchResources()
-                                    }
-                                 }} className="p-2 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all"><Trash2 size={12} /></button>
+                                 <div className="flex justify-end items-center gap-2">
+                                    <button onClick={async () => {
+                                       if (confirm(`确定要删除存储桶 ${bucket.name} 吗？`)) {
+                                          await window.api.cloudflare.deleteR2(config.apiToken, config.accountId, bucket.name)
+                                          fetchResources()
+                                       }
+                                    }} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={14} /></button>
+                                 </div>
                               </div>
                            ))}
                         </div>
@@ -489,9 +538,10 @@ const DeployApp: React.FC = () => {
                           <Zap size={28} />
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-lg font-black text-slate-900">
+                          <h3 className="text-lg font-black text-slate-900 leading-tight">
                             部署前端页面
                           </h3>
+                          <p className="text-[10px] text-slate-400 font-medium mt-1">快速发布您的 HTML/React 项目到 Pages</p>
                         </div>
                         <ChevronRight className="text-slate-200 group-hover:text-emerald-500 transition-colors" size={20} />
                       </button>
@@ -504,9 +554,10 @@ const DeployApp: React.FC = () => {
                           <Settings size={28} />
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-lg font-black text-slate-900">
+                          <h3 className="text-lg font-black text-slate-900 leading-tight">
                             部署管理后台
                           </h3>
+                          <p className="text-[10px] text-slate-400 font-medium mt-1">部署 D1 数据库架构与 Workers API</p>
                         </div>
                         <ChevronRight className="text-slate-200 group-hover:text-primary transition-colors" size={20} />
                       </button>
@@ -604,6 +655,7 @@ const DeployApp: React.FC = () => {
         domains={targetDomains}
         loading={loadingDomains}
         onAdd={handleAddDomain}
+        onDelete={handleDeleteDomain}
         newDomain={newDomain}
         setNewDomain={setNewDomain}
       />
@@ -616,15 +668,16 @@ interface DomainBindingModalProps {
   onClose: () => void
   type: 'page' | 'worker'
   name: string
-  domains: string[]
+  domains: { name: string; id?: string }[]
   loading: boolean
   onAdd: () => Promise<void>
+  onDelete: (domainName: string, domainId?: string) => Promise<void>
   newDomain: string
   setNewDomain: (val: string) => void
 }
 
 const DomainBindingModal: React.FC<DomainBindingModalProps> = ({ 
-  isOpen, onClose, type, name, domains, loading, onAdd, newDomain, setNewDomain 
+  isOpen, onClose, type, name, domains, loading, onAdd, onDelete, newDomain, setNewDomain 
 }) => {
   if (!isOpen) return null
 
@@ -662,8 +715,18 @@ const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
                 {domains.length > 0 ? (
                   domains.map((d, i) => (
                     <div key={i} className="px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between group">
-                      <span className="text-sm font-bold text-slate-700">{d}</span>
-                      <ExternalLink size={14} className="text-slate-300 group-hover:text-primary transition-colors cursor-pointer" />
+                      <span className="text-sm font-bold text-slate-700">{d.name}</span>
+                      <div className="flex items-center gap-2">
+                        <a href={`https://${d.name}`} target="_blank" rel="noreferrer">
+                          <ExternalLink size={14} className="text-slate-300 hover:text-primary transition-colors cursor-pointer" />
+                        </a>
+                        <button 
+                          onClick={() => onDelete(d.name, d.id)}
+                          className="p-1 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded transition-all"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   ))
                 ) : (

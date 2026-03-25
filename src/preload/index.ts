@@ -59,7 +59,13 @@ const api = {
     deleteR2: (apiToken: string, accountId: string, bucketName: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:deleteR2', apiToken, accountId, bucketName),
     getZones: (apiToken: string, accountId: string) =>
-      electronAPI.ipcRenderer.invoke('cloudflare:getZones', apiToken, accountId)
+      electronAPI.ipcRenderer.invoke('cloudflare:getZones', apiToken, accountId),
+    deletePageDomain: (apiToken: string, accountId: string, projectName: string, domainName: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:deletePageDomain', apiToken, accountId, projectName, domainName),
+    deleteWorkerDomain: (apiToken: string, accountId: string, domainId: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:deleteWorkerDomain', apiToken, accountId, domainId),
+    createDNSRecord: (apiToken: string, zoneId: string, type: string, name: string, content: string, proxied?: boolean) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:createDNSRecord', apiToken, zoneId, type, name, content, proxied)
   },
   openDeploy: () => electronAPI.ipcRenderer.send('window:open-deploy')
 }

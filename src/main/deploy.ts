@@ -249,4 +249,35 @@ export function setupDeployHandlers(): void {
     })
     return res.data.result
   })
+
+  ipcMain.handle(
+    'cloudflare:deletePageDomain',
+    async (_event, apiToken, accountId, projectName, domainName) => {
+      const res = await axios.delete(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/${projectName}/domains/${domainName}`,
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data
+    }
+  )
+
+  ipcMain.handle('cloudflare:deleteWorkerDomain', async (_event, apiToken, accountId, domainId) => {
+    const res = await axios.delete(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/domains/${domainId}`,
+      { headers: { Authorization: `Bearer ${apiToken}` } }
+    )
+    return res.data
+  })
+
+  ipcMain.handle(
+    'cloudflare:createDNSRecord',
+    async (_event, apiToken, zoneId, type, name, content, proxied = true) => {
+      const res = await axios.post(
+        `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`,
+        { type, name, content, proxied },
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data
+    }
+  )
 }

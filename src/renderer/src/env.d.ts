@@ -42,6 +42,9 @@ interface Window {
       deleteD1: (apiToken: string, accountId: string, databaseId: string) => Promise<any>
       deleteR2: (apiToken: string, accountId: string, bucketName: string) => Promise<any>
       getZones: (apiToken: string, accountId: string) => Promise<any[]>
+      deletePageDomain: (apiToken: string, accountId: string, projectName: string, domainName: string) => Promise<any>
+      deleteWorkerDomain: (apiToken: string, accountId: string, domainId: string) => Promise<any>
+      createDNSRecord: (apiToken: string, zoneId: string, type: string, name: string, content: string, proxied?: boolean) => Promise<any>
     }
     openDeploy: () => void
   }
