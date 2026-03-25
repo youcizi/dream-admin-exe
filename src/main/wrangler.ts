@@ -8,7 +8,13 @@ interface WranglerOptions {
   args: string[]
 }
 
-export function setupWranglerHandlers() {
+interface ProjectInfo {
+  path: string
+  name: string
+  config: string
+}
+
+export function setupWranglerHandlers(): void {
   let activeProcess: ChildProcess | null = null
 
   ipcMain.on('wrangler-run', (event: IpcMainEvent, options: WranglerOptions) => {
@@ -58,25 +64,34 @@ export function setupWranglerHandlers() {
     }
   })
 
-  ipcMain.handle('scan-projects', async (_event, rootPath: string) => {
+  ipcMain.handle('scan-projects', async (_event, rootPath: string): Promise<ProjectInfo[]> => {
     try {
       if (!fs.existsSync(rootPath)) return []
 
-      const results: any[] = []
-      const findWranglerToml = (dir: string, depth = 0) => {
+      const results: ProjectInfo[] = []
+      const findWranglerToml = (dir: string, depth = 0): void => {
         if (depth > 3) return // Prevent too deep scanning
 
         const files = fs.readdirSync(dir)
-        if (files.includes('wrangler.toml')) {
+        const hasWrangler = files.includes('wrangler.toml')
+        const hasIndex = files.includes('index.js') || files.includes('src/index.js')
+
+        if (hasWrangler || hasIndex) {
           const configPath = path.join(dir, 'wrangler.toml')
-          const content = fs.readFileSync(configPath, 'utf-8')
-          // Simple regex parsing for wrangler.toml
+          let content = ''
+          if (fs.existsSync(configPath)) {
+            content = fs.readFileSync(configPath, 'utf-8')
+          }
+          
           const nameMatch = content.match(/^name\s*=\s*"(.*)"/m)
           results.push({
             path: dir,
             name: nameMatch ? nameMatch[1] : path.basename(dir),
             config: content
           })
+          
+          // If we found a project, don't recurse further in this branch
+          return
         }
 
         for (const file of files) {
@@ -92,10 +107,34 @@ export function setupWranglerHandlers() {
       }
 
       findWranglerToml(rootPath)
+      
+      // If no project found but it's a valid directory, return the directory itself as a potential project
+      if (results.length === 0 && fs.existsSync(rootPath)) {
+        results.push({
+          path: rootPath,
+          name: path.basename(rootPath),
+          config: ''
+        })
+      }
+      
       return results
     } catch (error) {
       console.error('Scan projects error:', error)
       return []
     }
+  })
+
+  ipcMain.handle('wrangler:readConfig', async (_event, projectPath: string) => {
+    const configPath = path.join(projectPath, 'wrangler.toml')
+    if (fs.existsSync(configPath)) {
+      return fs.readFileSync(configPath, 'utf-8')
+    }
+    return ''
+  })
+
+  ipcMain.handle('wrangler:saveConfig', async (_event, projectPath: string, content: string) => {
+    const configPath = path.join(projectPath, 'wrangler.toml')
+    fs.writeFileSync(configPath, content, 'utf-8')
+    return true
   })
 }

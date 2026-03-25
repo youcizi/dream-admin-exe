@@ -16,7 +16,11 @@ const api = {
       electronAPI.ipcRenderer.on('wrangler-close', (_event, code) => callback(code)),
     onError: (callback: (err: string) => void) =>
       electronAPI.ipcRenderer.on('wrangler-error', (_event, err) => callback(err)),
-    scanProjects: (rootPath: string) => electronAPI.ipcRenderer.invoke('scan-projects', rootPath)
+    scanProjects: (rootPath: string) => electronAPI.ipcRenderer.invoke('scan-projects', rootPath),
+    readConfig: (projectPath: string) =>
+      electronAPI.ipcRenderer.invoke('wrangler:readConfig', projectPath),
+    saveConfig: (projectPath: string, content: string) =>
+      electronAPI.ipcRenderer.invoke('wrangler:saveConfig', projectPath, content)
   },
   project: {
     openDirectory: () => electronAPI.ipcRenderer.invoke('dialog:openDirectory'),
@@ -31,7 +35,9 @@ const api = {
   },
   cloudflare: {
     verifyToken: (apiToken: string, accountId: string) =>
-      electronAPI.ipcRenderer.invoke('cloudflare:verifyToken', apiToken, accountId)
+      electronAPI.ipcRenderer.invoke('cloudflare:verifyToken', apiToken, accountId),
+    createResources: (apiToken: string, accountId: string, resources: any) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:createResources', apiToken, accountId, resources)
   },
   openDeploy: () => electronAPI.ipcRenderer.send('window:open-deploy')
 }
