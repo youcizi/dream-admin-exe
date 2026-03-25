@@ -29,6 +29,10 @@ const api = {
   auth: {
     openLogin: (url: string) => electronAPI.ipcRenderer.invoke('auth:open-login', url)
   },
+  cloudflare: {
+    verifyToken: (apiToken: string, accountId: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:verifyToken', apiToken, accountId)
+  },
   openDeploy: () => electronAPI.ipcRenderer.send('window:open-deploy')
 }
 

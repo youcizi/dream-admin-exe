@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import { join } from 'path'
+import axios from 'axios'
 
 export function setupDeployHandlers(): void {
   let deployWindow: BrowserWindow | null = null
@@ -31,5 +32,25 @@ export function setupDeployHandlers(): void {
     deployWindow.on('closed', () => {
       deployWindow = null
     })
+  })
+
+  ipcMain.handle('cloudflare:verifyToken', async (_event, apiToken: string, accountId: string) => {
+    try {
+      const response = await axios.get(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/tokens/verify`,
+        {
+          headers: {
+            Authorization: `Bearer ${apiToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+      return response.data
+    } catch (error: any) {
+      if (error.response) {
+        return error.response.data
+      }
+      throw error
+    }
   })
 }

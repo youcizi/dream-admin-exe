@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, History, Cloud, Settings, ExternalLink, ShieldCheck, Zap } from 'lucide-react'
+import { Plus, History, Cloud, Settings, ExternalLink, ShieldCheck, Zap, RefreshCw, XCircle } from 'lucide-react'
 import DeployConfigModal from './DeployConfigModal'
 import DeployProcess from './DeployProcess'
 
@@ -14,6 +14,8 @@ const DeployApp: React.FC = () => {
   const [config, setConfig] = useState<{ apiToken: string; accountId: string } | null>(null)
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [history, setHistory] = useState<DeploymentRecord[]>([])
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [verifyStatus, setVerifyStatus] = useState<'success' | 'failure' | null>(null)
 
   useEffect(() => {
     // Load config
@@ -32,6 +34,31 @@ const DeployApp: React.FC = () => {
   const handleSaveConfig = (newConfig: { apiToken: string; accountId: string }): void => {
     localStorage.setItem('cloudflare_config', JSON.stringify(newConfig))
     setConfig(newConfig)
+    setVerifyStatus(null)
+  }
+
+  const handleVerify = async (): Promise<void> => {
+    if (!config) return
+    setIsVerifying(true)
+    setVerifyStatus(null)
+
+    try {
+      const data = await window.api.cloudflare.verifyToken(config.apiToken, config.accountId)
+
+      if (data.success) {
+        setVerifyStatus('success')
+        alert('验证成功：该 API Token 有效且处于激活状态')
+      } else {
+        setVerifyStatus('failure')
+        const msg = data.errors?.[0]?.message || '验证失败'
+        alert(`验证失败：${msg}`)
+      }
+    } catch {
+      setVerifyStatus('failure')
+      alert('验证失败：网络请求错误')
+    } finally {
+      setIsVerifying(false)
+    }
   }
 
   const handleStartDeployBackend = (): void => {
@@ -157,7 +184,15 @@ const DeployApp: React.FC = () => {
                   <div
                     className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${config ? 'bg-emerald-50 text-emerald-500' : 'bg-red-50 text-red-500'}`}
                   >
-                    {config ? <ShieldCheck size={24} /> : <Cloud size={24} />}
+                    {verifyStatus === 'success' ? (
+                      <ShieldCheck size={24} />
+                    ) : verifyStatus === 'failure' ? (
+                      <XCircle size={24} className="text-red-500" />
+                    ) : config ? (
+                      <ShieldCheck size={24} />
+                    ) : (
+                      <Cloud size={24} />
+                    )}
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
@@ -174,6 +209,20 @@ const DeployApp: React.FC = () => {
                 <div className="h-10 w-px bg-slate-100 hidden sm:block" />
 
                 <div className="flex items-center gap-6">
+                  {config && (
+                    <button
+                      onClick={handleVerify}
+                      disabled={isVerifying}
+                      className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95 flex items-center gap-2"
+                    >
+                      {isVerifying ? (
+                        <RefreshCw size={14} className="animate-spin" />
+                      ) : (
+                        <ShieldCheck size={14} />
+                      )}
+                      验证
+                    </button>
+                  )}
                   <button
                     onClick={() => setIsConfigModalOpen(true)}
                     className="px-6 py-3 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-900/10"

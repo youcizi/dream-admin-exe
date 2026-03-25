@@ -9,6 +9,9 @@ interface Window {
     auth: {
       openLogin: (url: string) => Promise<string | null>
     }
+    cloudflare: {
+      verifyToken: (apiToken: string, accountId: string) => Promise<any>
+    }
     openDeploy: () => void
   }
 }

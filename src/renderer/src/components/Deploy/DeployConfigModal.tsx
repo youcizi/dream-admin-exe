@@ -28,18 +28,35 @@ const DeployConfigModal: React.FC<DeployConfigModalProps> = ({
 
   if (!isOpen) return null
 
-  const handleSave = (): void => {
+  const handleSave = async (): Promise<void> => {
     if (!apiToken || !accountId) {
       setError('请提供完整的 API Token 和 Account ID')
       return
     }
     setError('')
-    onSave({ apiToken, accountId })
-    setSaved(true)
-    setTimeout(() => {
-      setSaved(false)
-      onClose()
-    }, 1500)
+    setSaved(false)
+
+    try {
+      const data = await window.api.cloudflare.verifyToken(apiToken, accountId)
+
+      if (data.success) {
+        setSaved(true)
+        onSave({ apiToken, accountId })
+        setTimeout(() => {
+          setSaved(false)
+          onClose()
+        }, 1500)
+      } else {
+        const errorMsg = data.errors?.[0]?.message || '验证失败，请检查 API Token 和 Account ID'
+        setError(errorMsg)
+        // 无论成功还是失败都需要存储这两个信息
+        onSave({ apiToken, accountId })
+      }
+    } catch {
+      setError('网络请求失败，请稍后重试')
+      // 无论成功还是失败都需要存储这两个信息
+      onSave({ apiToken, accountId })
+    }
   }
 
   return (
