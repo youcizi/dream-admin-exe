@@ -342,4 +342,16 @@ export function setupDeployHandlers(): void {
       return res.data.result
     }
   )
+
+  ipcMain.handle(
+    'cloudflare:queryD1',
+    async (_event, apiToken: string, accountId: string, databaseId: string, sql: string) => {
+      const res = await axios.post(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
+        { sql },
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data
+    }
+  )
 }

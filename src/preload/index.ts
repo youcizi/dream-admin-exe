@@ -79,7 +79,9 @@ const api = {
     createDNSRecord: (apiToken: string, zoneId: string, type: string, name: string, content: string, proxied?: boolean) =>
       electronAPI.ipcRenderer.invoke('cloudflare:createDNSRecord', apiToken, zoneId, type, name, content, proxied),
     getDNSRecords: (apiToken: string, zoneId: string, domainName: string) =>
-      electronAPI.ipcRenderer.invoke('cloudflare:getDNSRecords', apiToken, zoneId, domainName)
+      electronAPI.ipcRenderer.invoke('cloudflare:getDNSRecords', apiToken, zoneId, domainName),
+    queryD1: (apiToken: string, accountId: string, databaseId: string, sql: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:queryD1', apiToken, accountId, databaseId, sql)
   },
   openExternal: (url: string) => electronAPI.ipcRenderer.invoke('shell:openExternal', url),
   openDeploy: () => electronAPI.ipcRenderer.send('window:open-deploy')

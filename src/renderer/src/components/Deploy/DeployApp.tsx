@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import DeployConfigModal from './DeployConfigModal'
 import DeployProcess from './DeployProcess'
+import D1Viewer from './D1Viewer'
 
 interface DeploymentRecord {
   name: string
@@ -36,6 +37,9 @@ const DeployApp: React.FC = () => {
   const [resourceModalType, setResourceModalType] = useState<'d1' | 'r2' | null>(null)
   const [newResourceName, setNewResourceName] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+  
+  const [selectedD1, setSelectedD1] = useState<D1Database | null>(null)
+  const [isD1ViewerOpen, setIsD1ViewerOpen] = useState(false)
   
   interface PagesProject {
     id: string
@@ -576,12 +580,26 @@ const DeployApp: React.FC = () => {
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {resources.d1.map((db: D1Database) => (
-                              <div key={db.uuid} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-4">
-                                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400">
+                              <div key={db.uuid} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:border-primary/20">
+                                <div 
+                                  className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 cursor-pointer hover:bg-indigo-50 hover:text-primary transition-all"
+                                  onClick={() => {
+                                    setSelectedD1(db)
+                                    setIsD1ViewerOpen(true)
+                                  }}
+                                >
                                   <Database size={22} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h3 className="text-[13px] font-black text-slate-800 truncate leading-tight mb-1">{db.name}</h3>
+                                  <h3 
+                                    className="text-[13px] font-black text-slate-800 truncate leading-tight mb-1 cursor-pointer hover:text-primary transition-colors"
+                                    onClick={() => {
+                                      setSelectedD1(db)
+                                      setIsD1ViewerOpen(true)
+                                    }}
+                                  >
+                                    {db.name}
+                                  </h3>
                                   <p className="text-[9px] font-bold text-slate-400 font-mono tracking-tighter truncate">{db.uuid}</p>
                                 </div>
                                 <div className="flex flex-col gap-2">
@@ -964,6 +982,12 @@ const DeployApp: React.FC = () => {
         setNewDomain={setNewDomain}
         successMsg={successMsg}
       />
+      <D1Viewer
+        isOpen={isD1ViewerOpen}
+        onClose={() => setIsD1ViewerOpen(false)}
+        database={selectedD1}
+        config={config}
+      />
     </div>
   )
 }
@@ -1098,11 +1122,10 @@ const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
                     配置教程
                   </button>
                 </p>
-              </div>
             </div>
           </div>
         </div>
-        
+      </div>
         <div className="p-6 bg-slate-50 border-t border-slate-100 text-center">
           <p className="text-[10px] font-medium text-slate-400">
             绑定域名后，请确保在 Cloudflare DNS 中配置了正确的 CNAME 记录。
