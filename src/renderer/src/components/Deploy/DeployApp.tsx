@@ -418,7 +418,7 @@ const DeployApp: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                           {resources.workers.map((worker: WorkerService) => {
                             const customDomain = worker.domains?.[0]?.name
-                            const defaultDomain = worker.subdomain ? `${worker.name}.${worker.subdomain}.workers.dev` : null
+                            const defaultDomain = worker.subdomain ? `${worker.id || worker.name}.${worker.subdomain}.workers.dev` : null
                             const displayDomain = customDomain || defaultDomain
 
                             return (
@@ -429,7 +429,7 @@ const DeployApp: React.FC = () => {
                                       <Settings size={22} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <h3 className="text-sm font-black text-slate-900 truncate">{worker.name}</h3>
+                                      <h3 className="text-sm font-black text-slate-900 truncate">{worker.id || worker.name}</h3>
                                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Workers 应用</p>
                                     </div>
                                   </div>
@@ -453,7 +453,7 @@ const DeployApp: React.FC = () => {
                                     Active
                                   </span>
                                   <button 
-                                    onClick={() => handleOpenDomainModal('worker', worker.name)}
+                                    onClick={() => handleOpenDomainModal('worker', worker.id || worker.name)}
                                     className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
                                   >
                                     域名管理
