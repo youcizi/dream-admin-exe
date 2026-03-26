@@ -52,10 +52,16 @@ const api = {
       electronAPI.ipcRenderer.invoke('cloudflare:addWorkerDomain', apiToken, accountId, service, hostname, zoneId),
     deleteWorker: (apiToken: string, accountId: string, scriptName: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:deleteWorker', apiToken, accountId, scriptName),
+    getWorkerSubdomain: (apiToken: string, accountId: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:getWorkerSubdomain', apiToken, accountId),
     renameD1: (apiToken: string, accountId: string, databaseId: string, name: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:renameD1', apiToken, accountId, databaseId, name),
     deleteD1: (apiToken: string, accountId: string, databaseId: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:deleteD1', apiToken, accountId, databaseId),
+    createD1: (apiToken: string, accountId: string, name: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:createD1', apiToken, accountId, name),
+    createR2: (apiToken: string, accountId: string, name: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:createR2', apiToken, accountId, name),
     deleteR2: (apiToken: string, accountId: string, bucketName: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:deleteR2', apiToken, accountId, bucketName),
     getZones: (apiToken: string, accountId: string) =>
@@ -65,8 +71,11 @@ const api = {
     deleteWorkerDomain: (apiToken: string, accountId: string, domainId: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:deleteWorkerDomain', apiToken, accountId, domainId),
     createDNSRecord: (apiToken: string, zoneId: string, type: string, name: string, content: string, proxied?: boolean) =>
-      electronAPI.ipcRenderer.invoke('cloudflare:createDNSRecord', apiToken, zoneId, type, name, content, proxied)
+      electronAPI.ipcRenderer.invoke('cloudflare:createDNSRecord', apiToken, zoneId, type, name, content, proxied),
+    getDNSRecords: (apiToken: string, zoneId: string, domainName: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:getDNSRecords', apiToken, zoneId, domainName)
   },
+  openExternal: (url: string) => electronAPI.ipcRenderer.invoke('shell:openExternal', url),
   openDeploy: () => electronAPI.ipcRenderer.send('window:open-deploy')
 }
 

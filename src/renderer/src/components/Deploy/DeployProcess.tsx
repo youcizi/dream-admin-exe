@@ -23,9 +23,10 @@ interface ProjectInfo {
 
 interface DeployProcessProps {
   onBack: () => void
+  type: 'frontend' | 'backend'
 }
 
-const DeployProcess: React.FC<DeployProcessProps> = ({ onBack }) => {
+const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type }) => {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null)
@@ -117,7 +118,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
 
       // 4. Run Wrangler Deploy
       setDeployLogs((prev) => [...prev, '正在启动部署命令: npx wrangler deploy...'])
-      
+
       window.api.wrangler.onStdout((data) => {
         setDeployLogs((prev) => [...prev, data])
         // Extract domain from output
@@ -139,48 +140,43 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
       window.api.wrangler.onClose(async (code) => {
         if (code === 0) {
           setDeployLogs((prev) => [...prev, '代码部署成功，正在准备数据库迁移...'])
-          
+
           // 5. Execute Migration if schema.sql exists
           setDeployLogs((prev) => [...prev, '正在执行数据表写入 (npx wrangler d1 execute DB --file=schema.sql --remote)...'])
-          
-          // We use npx wrangler d1 execute
-          // Note: Since we don't have a direct file existence check, we'll try to run it.
-          // If it fails because schema.sql is missing, the command will exit with non-zero.
-          
-          let migrationSuccess = false;
-          
-          const runMigration = () => {
-             return new Promise<void>((resolve, reject) => {
-                window.api.wrangler.onStdout((data) => {
-                  setDeployLogs((prev) => [...prev, `[DB] ${data}`])
-                })
-                window.api.wrangler.onStderr((data) => {
-                   setDeployLogs((prev) => [...prev, `[DB ERR] ${data}`])
-                })
-                window.api.wrangler.onClose((mCode) => {
-                  if (mCode === 0) {
-                    migrationSuccess = true;
-                    resolve()
-                  } else {
-                    reject(new Error(`数据库迁移失败，退出码: ${mCode}`))
-                  }
-                })
-                window.api.wrangler.run({
-                  cwd: projectInfo.path,
-                  args: ['d1', 'execute', 'DB', '--file=schema.sql', '--remote', '-y']
-                })
-             })
+
+
+          const runMigration = (): Promise<void> => {
+            return new Promise<void>((resolve, reject) => {
+              window.api.wrangler.onStdout((data) => {
+                setDeployLogs((prev) => [...prev, `[DB] ${data}`])
+              })
+              window.api.wrangler.onStderr((data) => {
+                setDeployLogs((prev) => [...prev, `[DB ERR] ${data}`])
+              })
+              window.api.wrangler.onClose((mCode) => {
+                if (mCode === 0) {
+                  resolve()
+                } else {
+                  reject(new Error(`数据库迁移失败，退出码: ${mCode}`))
+                }
+              })
+              window.api.wrangler.run({
+                cwd: projectInfo.path,
+                args: ['d1', 'execute', 'DB', '--file=schema.sql', '--remote', '-y']
+              })
+            })
           }
 
           try {
             await runMigration()
             setDeployStatus('success')
             setDeployLogs((prev) => [...prev, '🎉 部署完全成功！所有数据表已初始化。'])
-            
+
             // 6. Save Deployment History
             const history = JSON.parse(localStorage.getItem('deploy_history') || '[]')
             const newEntry = {
               name: configFields.name,
+              type: type,
               url: deployedUrl,
               d1Id: resources.d1Id,
               d1Name: configFields.database_name,
@@ -262,7 +258,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
 
       const projectPath = await window.api.project.downloadAndExtract(remoteUrl, baseDir)
       const projects = await window.api.wrangler.scanProjects(projectPath)
-      
+
       if (projects && projects.length > 0) {
         setProjectInfo(projects[0])
         await parseExistingConfig(projects[0].path, projects[0].config)
@@ -307,9 +303,11 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900">部署管理后台</h1>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900">
+              部署{type === 'frontend' ? '前端应用' : '管理后台'}
+            </h1>
             <p className="mt-0.5 text-xs font-medium text-slate-400">
-              按照以下步骤完成您的系统部署
+              Cloudflare {type === 'frontend' ? 'Pages' : 'Workers'} Deployment Pipeline
             </p>
           </div>
         </div>
@@ -319,13 +317,12 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
           {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center gap-2">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-500 shadow-lg ${
-                  step === s
-                    ? 'bg-primary text-white scale-110 shadow-primary/30 ring-4 ring-primary/10'
-                    : step > s
-                      ? 'bg-emerald-500 text-white shadow-emerald-500/30'
-                      : 'bg-slate-100 text-slate-400'
-                }`}
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all duration-500 shadow-lg ${step === s
+                  ? 'bg-primary text-white scale-110 shadow-primary/30 ring-4 ring-primary/10'
+                  : step > s
+                    ? 'bg-emerald-500 text-white shadow-emerald-500/30'
+                    : 'bg-slate-100 text-slate-400'
+                  }`}
               >
                 {step > s ? <CheckCircle2 size={16} /> : s}
               </div>
@@ -466,9 +463,8 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                       onChange={(e) =>
                         setConfigFields({ ...configFields, database_name: e.target.value })
                       }
-                      className={`w-full px-5 py-3 bg-slate-50 border rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all ${
-                        isD1NameConflict ? 'border-amber-200 focus:border-amber-500' : 'border-slate-100'
-                      }`}
+                      className={`w-full px-5 py-3 bg-slate-50 border rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all ${isD1NameConflict ? 'border-amber-200 focus:border-amber-500' : 'border-slate-100'
+                        }`}
                     />
                   </div>
 
@@ -489,9 +485,8 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                       onChange={(e) =>
                         setConfigFields({ ...configFields, bucket_name: e.target.value })
                       }
-                      className={`w-full px-5 py-3 bg-slate-50 border rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all ${
-                        isR2NameConflict ? 'border-amber-200 focus:border-amber-500' : 'border-slate-100'
-                      }`}
+                      className={`w-full px-5 py-3 bg-slate-50 border rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all ${isR2NameConflict ? 'border-amber-200 focus:border-amber-500' : 'border-slate-100'
+                        }`}
                     />
                   </div>
                 </div>
@@ -561,20 +556,18 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                   </div>
                 </div>
               </div>
-
-              <div className="p-6 bg-indigo-50/50 rounded-[2rem] border border-indigo-100/50 flex items-center gap-4">
-                <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
-                  <CheckCircle2 size={20} />
-                </div>
-                <p className="text-[11px] text-indigo-900/60 font-medium leading-relaxed">
-                  系统将自动在您的 Cloudflare 账户中创建或复用资源。
-                  若有疑问，请访查 <a href={HELP_URL} target="_blank" rel="noreferrer" className="text-primary font-black underline">帮助中心</a>。
-                </p>
-              </div>
             </div>
           </div>
-
-          <div className="flex items-center justify-center gap-6 pt-6">
+          <div className="p-6 bg-indigo-50/50 rounded-[2rem] border border-indigo-100/50 flex items-center gap-4">
+            <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
+              <CheckCircle2 size={20} />
+            </div>
+            <p className="text-[11px] text-indigo-900/60 font-medium leading-relaxed">
+              系统将自动在您的 Cloudflare 账户中创建或复用资源。
+              若有疑问，请访查 <a href={HELP_URL} target="_blank" rel="noreferrer" className="text-primary font-black underline">帮助中心</a>。
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-6">
             <button
               onClick={() => setStep(1)}
               className="px-10 py-5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 active:scale-95 transition-all"
@@ -629,13 +622,12 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
               {deployLogs.map((log, i) => (
                 <div
                   key={i}
-                  className={`flex gap-3 animate-in slide-in-from-left-2 duration-300 ${
-                    log.startsWith('[ERR]') || log.startsWith('[ERROR]') || log.startsWith('[异常]')
-                      ? 'text-red-400'
-                      : log.startsWith('[SUCCESS]') || log.startsWith('🎉')
-                        ? 'text-emerald-400'
-                        : 'text-slate-300'
-                  }`}
+                  className={`flex gap-3 animate-in slide-in-from-left-2 duration-300 ${log.startsWith('[ERR]') || log.startsWith('[ERROR]') || log.startsWith('[异常]')
+                    ? 'text-red-400'
+                    : log.startsWith('[SUCCESS]') || log.startsWith('🎉')
+                      ? 'text-emerald-400'
+                      : 'text-slate-300'
+                    }`}
                 >
                   <span className="text-slate-600 select-none w-4 tabular-nums">
                     {(i + 1).toString().padStart(2, '0')}

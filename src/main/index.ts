@@ -78,6 +78,10 @@ app.whenReady().then(() => {
     return filePaths[0]
   })
 
+  ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+    await shell.openExternal(url)
+  })
+
   ipcMain.handle('project:downloadAndExtract', async (_event, url: string, destDir: string) => {
     try {
       if (!fs.existsSync(destDir)) {

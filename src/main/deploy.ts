@@ -13,7 +13,7 @@ export function setupDeployHandlers(): void {
     }
 
     deployWindow = new BrowserWindow({
-      width: 1000,
+      width: 1044,
       height: 750,
       title: '应用部署管理',
       autoHideMenuBar: true,
@@ -185,6 +185,13 @@ export function setupDeployHandlers(): void {
     return res.data.result
   })
 
+  ipcMain.handle('cloudflare:getWorkerSubdomain', async (_event, apiToken, accountId) => {
+    const res = await axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`, {
+      headers: { Authorization: `Bearer ${apiToken}` }
+    })
+    return res.data.result?.subdomain || ''
+  })
+
   ipcMain.handle(
     'cloudflare:addWorkerDomain',
     async (_event, apiToken, accountId, service, hostname, zoneId) => {
@@ -234,6 +241,24 @@ export function setupDeployHandlers(): void {
     return res.data
   })
 
+  ipcMain.handle('cloudflare:createD1', async (_event, apiToken, accountId, name) => {
+    const res = await axios.post(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database`,
+      { name },
+      { headers: { Authorization: `Bearer ${apiToken}` } }
+    )
+    return res.data
+  })
+
+  ipcMain.handle('cloudflare:createR2', async (_event, apiToken, accountId, name) => {
+    const res = await axios.post(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets`,
+      { name },
+      { headers: { Authorization: `Bearer ${apiToken}` } }
+    )
+    return res.data
+  })
+
   ipcMain.handle('cloudflare:deleteR2', async (_event, apiToken, accountId, bucketName) => {
     const res = await axios.delete(
       `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucketName}`,
@@ -278,6 +303,20 @@ export function setupDeployHandlers(): void {
         { headers: { Authorization: `Bearer ${apiToken}` } }
       )
       return res.data
+    }
+  )
+
+  ipcMain.handle(
+    'cloudflare:getDNSRecords',
+    async (_event, apiToken, zoneId, domainName) => {
+      const res = await axios.get(
+        `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`,
+        { 
+          params: { name: domainName },
+          headers: { Authorization: `Bearer ${apiToken}` } 
+        }
+      )
+      return res.data.result
     }
   )
 }
