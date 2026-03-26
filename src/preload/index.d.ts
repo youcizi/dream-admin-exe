@@ -19,7 +19,12 @@ declare global {
       }
       project: {
         openDirectory: () => Promise<string>
-        downloadAndExtract: (url: string, destDir: string) => Promise<void>
+        downloadAndExtract: (url: string, destDir: string) => Promise<string>
+        saveFile: (content: string, defaultName: string) => Promise<string | null>
+      }
+      shell: {
+        openExternal: (url: string) => Promise<void>
+        openPath: (path: string) => Promise<void>
       }
       crawler: {
         crawl: (url: string) => Promise<any>
@@ -53,7 +58,6 @@ declare global {
         deleteR2Object: (apiToken: string, accountId: string, bucketName: string, key: string) => Promise<any>
         uploadR2Object: (apiToken: string, accountId: string, bucketName: string, key: string, filePath: string) => Promise<any>
       }
-      openExternal: (url: string) => Promise<void>
       openDeploy: () => void
     }
   }

@@ -31,7 +31,13 @@ const api = {
   project: {
     openDirectory: () => electronAPI.ipcRenderer.invoke('dialog:openDirectory'),
     downloadAndExtract: (url: string, destDir: string) =>
-      electronAPI.ipcRenderer.invoke('project:downloadAndExtract', url, destDir)
+      electronAPI.ipcRenderer.invoke('project:downloadAndExtract', url, destDir),
+    saveFile: (content: string, defaultName: string) =>
+      electronAPI.ipcRenderer.invoke('project:saveFile', content, defaultName)
+  },
+  shell: {
+    openExternal: (url: string) => electronAPI.ipcRenderer.invoke('shell:openExternal', url),
+    openPath: (path: string) => electronAPI.ipcRenderer.invoke('shell:openPath', path)
   },
   crawler: {
     crawl: (url: string) => electronAPI.ipcRenderer.invoke('crawl-url', url)

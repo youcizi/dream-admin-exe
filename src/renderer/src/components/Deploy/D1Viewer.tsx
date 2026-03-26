@@ -165,15 +165,14 @@ const D1Viewer: React.FC<D1ViewerProps> = ({ isOpen, onClose, database, config }
         }
       }
 
-      const blob = new Blob([fullSql], { type: 'text/plain' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${database?.name || 'd1-export'}_${new Date().toISOString().split('T')[0]}.sql`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      const defaultFilename = `${database?.name || 'd1-export'}_${new Date().toISOString().split('T')[0]}.sql`
+      
+      // @ts-expect-error - window.api.project.saveFile is added in preload
+      const savedPath = await window.api.project.saveFile(fullSql, defaultFilename)
+      
+      if (savedPath) {
+        alert(`数据库导出成功！\n保存路径: ${savedPath}`)
+      }
     } catch (err: any) {
       setError(`导出失败: ${err.message}`)
     } finally {

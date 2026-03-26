@@ -325,7 +325,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
       <div className="mb-6 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-6">
           <button
-            onClick={onBack}
+            onClick={() => onBack(type === 'frontend' ? 'frontend' : 'backend')}
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-100 bg-white text-slate-400 shadow-sm transition-all hover:border-slate-200 hover:text-slate-900 active:scale-95"
           >
             <ArrowLeft size={18} />

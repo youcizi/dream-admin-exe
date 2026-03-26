@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { 
   Plus, History, Cloud, Settings, ExternalLink, ShieldCheck, Zap, 
   RefreshCw, XCircle, ChevronRight, Globe, Database, Trash2, AlertTriangle,
-  Copy, Check
+  Copy, Check, HelpCircle
 } from 'lucide-react'
 import DeployConfigModal from './DeployConfigModal'
 import DeployProcess from './DeployProcess'
@@ -18,6 +18,8 @@ interface DeploymentRecord {
   r2Name: string
   timestamp: number
 }
+
+const HELP_URL = 'https://soft.ycz.me/help'
 
 const DeployApp: React.FC = () => {
   const [view, setView] = useState<'initial' | 'deploy-backend' | 'deploy-frontend'>('initial')
@@ -264,42 +266,16 @@ const DeployApp: React.FC = () => {
         await window.api.cloudflare.addWorkerDomain(config.apiToken, config.accountId, domainModalTarget.name, newDomain, zoneId)
       }
 
-      // 3. DNS Record Auto-creation
-      try {
-        let content = ''
-        if (domainModalTarget.type === 'page') {
-          content = `${domainModalTarget.name}.pages.dev`
-        } else {
-          const subdomain = await window.api.cloudflare.getWorkerSubdomain(config.apiToken, config.accountId)
-          content = subdomain ? `${domainModalTarget.name}.${subdomain}.workers.dev` : ''
-        }
-        
-        if (content) {
-          // Check if record exists
-          const existingRecords = await window.api.cloudflare.getDNSRecords(config.apiToken, zoneId, newDomain)
-          const hasCNAME = existingRecords.some((r: any) => r.type === 'CNAME')
-          
-          if (!hasCNAME) {
-            await window.api.cloudflare.createDNSRecord(
-              config.apiToken,
-              zoneId,
-              'CNAME',
-              newDomain,
-              content,
-              true
-            )
-          }
-        }
-      } catch (dnsErr: any) {
-        console.error('DNS auto-creation failed:', dnsErr)
-        alert(`DNS 解析自动添加失败: ${dnsErr.message || '请手动在 Cloudflare 控制台添加 CNAME 记录。'}`)
-      }
-      
       handleOpenDomainModal(domainModalTarget.type, domainModalTarget.name)
       setNewDomain('')
       fetchResources()
-      setSuccessMsg('域名绑定成功！系统已尝试自动完成 DNS 解析。')
-      setTimeout(() => setSuccessMsg(null), 5000)
+      
+      const successTip = domainModalTarget.type === 'page'
+        ? '域名已添加到 Pages 项目！请务必手动在 Cloudflare 控制台为该域名设置 CNAME 解析记录。'
+        : '域名已作为 Custom Domain 绑定到 Worker！Cloudflare 通常会自动尝试同步 DNS 记录。'
+        
+      setSuccessMsg(`${successTip}`)
+      setTimeout(() => setSuccessMsg(null), 10000)
     } catch (err: any) {
       if (err.message === 'missing_zone') {
         setResourceError('未找到匹配的 Cloudflare 站点。请确保主域名已添加到 Cloudflare。')
@@ -1037,13 +1013,8 @@ const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
 
   React.useEffect(() => {
     if (isOpen) {
-      // 增加微小延迟以确保动画开始且 DOM 就绪
-      const timer = setTimeout(() => {
-        inputRef.current?.focus()
-      }, 100)
-      return () => clearTimeout(timer)
+      setTimeout(() => inputRef.current?.focus(), 100)
     }
-    return undefined
   }, [isOpen])
 
   if (!isOpen) return null
@@ -1074,9 +1045,20 @@ const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
           </div>
 
           {successMsg && (
-            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-              <ShieldCheck className="text-emerald-500" size={18} />
-              <p className="text-xs font-bold text-emerald-600">{successMsg}</p>
+            <div className="mb-6 p-5 bg-indigo-50 border border-indigo-100 rounded-[2.5rem] flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-indigo-500 shrink-0 shadow-sm border border-indigo-100/50">
+                <HelpCircle size={20} />
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1.5">操作说明</p>
+                <p className="text-xs font-bold text-indigo-700 leading-relaxed mb-3">{successMsg}</p>
+                <button 
+                  onClick={() => window.api.openExternal(HELP_URL)}
+                  className="px-4 py-2 bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-600 transition-all active:scale-95"
+                >
+                  查看配置教程
+                </button>
+              </div>
             </div>
           )}
 
@@ -1136,18 +1118,18 @@ const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
                   增加
                 </button>
               </div>
-              <div className="mt-4 flex items-center gap-2">
-                <ShieldCheck size={12} className="text-emerald-500" />
-                <p className="text-[10px] font-medium text-slate-400">
-                  绑定域名后，系统将尝试自动添加 DNS 解析。如有问题请查看 
+              <div className="mt-6 flex items-start gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
+                <HelpCircle size={14} className="text-slate-400 mt-0.5" />
+                <p className="text-[10px] font-medium text-slate-500 leading-relaxed">
+                  绑定域名后，您需要前往 Cloudflare 控制台手动配置 CNAME 或 DNS 解析记录。
                   <button 
-                    onClick={() => window.api.openExternal('https://soft.ycz.me/help')}
-                    className="text-primary hover:underline ml-1 font-bold"
+                    onClick={() => window.api.openExternal(HELP_URL)}
+                    className="text-indigo-500 hover:text-indigo-600 ml-1 font-black underline"
                   >
-                    配置教程
+                    查看教程
                   </button>
                 </p>
-            </div>
+              </div>
           </div>
         </div>
       </div>

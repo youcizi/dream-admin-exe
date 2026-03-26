@@ -82,6 +82,20 @@ app.whenReady().then(() => {
     await shell.openExternal(url)
   })
 
+  ipcMain.handle('project:saveFile', async (_event, content: string, defaultName: string) => {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      defaultPath: defaultName,
+      filters: [{ name: 'SQL Files', extensions: ['sql'] }, { name: 'All Files', extensions: ['*'] }]
+    })
+    if (canceled || !filePath) return null
+    fs.writeFileSync(filePath, content, 'utf8')
+    return filePath
+  })
+
+  ipcMain.handle('shell:openPath', async (_event, path: string) => {
+    await shell.openPath(path)
+  })
+
   ipcMain.handle('project:downloadAndExtract', async (_event, url: string, destDir: string) => {
     try {
       if (!fs.existsSync(destDir)) {
