@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { 
   Plus, History, Cloud, Settings, ExternalLink, ShieldCheck, Zap, 
-  RefreshCw, XCircle, ChevronRight, Globe, Layers, Database, Trash2, Edit3, AlertTriangle 
+  RefreshCw, XCircle, ChevronRight, Globe, Database, Trash2, AlertTriangle 
 } from 'lucide-react'
 import DeployConfigModal from './DeployConfigModal'
 import DeployProcess from './DeployProcess'
@@ -737,9 +737,17 @@ const DeployApp: React.FC = () => {
           </div>
         )}
 
-        {view === 'deploy-frontend' && <DeployProcess type="frontend" onBack={() => setView('initial')} />}
+        {view === 'deploy-frontend' && (
+          <div className="flex-1 overflow-hidden h-full">
+            <DeployProcess type="frontend" onBack={() => setView('initial')} />
+          </div>
+        )}
 
-        {view === 'deploy-backend' && <DeployProcess type="backend" onBack={() => setView('initial')} />}
+        {view === 'deploy-backend' && (
+          <div className="flex-1 overflow-hidden h-full">
+            <DeployProcess type="backend" onBack={() => setView('initial')} />
+          </div>
+        )}
       </main>
 
       <DeployConfigModal

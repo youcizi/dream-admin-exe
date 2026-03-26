@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import {
   FolderOpen,
   Github,
@@ -63,20 +63,33 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type }) => {
   const isD1NameConflict = existingResources.d1.some((db) => db.name === configFields.database_name)
   const isR2NameConflict = existingResources.r2.some((b) => b.name === configFields.bucket_name)
 
+  const consoleRef = useRef<HTMLDivElement>(null)
+
   React.useEffect(() => {
-    const logsEnd = document.getElementById('logs-end')
-    if (logsEnd) {
-      logsEnd.scrollIntoView({ behavior: 'smooth' })
+    if (consoleRef.current) {
+      consoleRef.current.scrollTop = consoleRef.current.scrollHeight
     }
   }, [deployLogs])
 
   const handleStartDeploy = async (): Promise<void> => {
     if (!projectInfo) return
 
+    // Pre-check for conflicts and empty fields
+    if (!configFields.database_name || !configFields.bucket_name) {
+      setError('请完整填写数据库和存储桶名称')
+      return
+    }
+
+    if (isD1NameConflict) {
+      if (!confirm(`数据库名称 "${configFields.database_name}" 在您的账户中已存在。继续部署将尝试复用该数据库，是否继续？`)) {
+        return
+      }
+    }
+
     try {
       setDeployStatus('running')
       setStep(3)
-      setDeployLogs(['开始部署流程...'])
+      setDeployLogs(['🚀 启动部署流程...'])
 
       // 1. Create/Verify Cloudflare Resources
       setDeployLogs((prev) => [...prev, '正在验证 Cloudflare 资源 (D1 & R2)...'])
@@ -139,12 +152,9 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
 
       window.api.wrangler.onClose(async (code) => {
         if (code === 0) {
-          setDeployLogs((prev) => [...prev, '代码部署成功，正在准备数据库迁移...'])
-
-          // 5. Execute Migration if schema.sql exists
-          setDeployLogs((prev) => [...prev, '正在执行数据表写入 (npx wrangler d1 execute DB --file=schema.sql --remote)...'])
-
-
+          setDeployLogs((prev) => [...prev, '[SUCCESS] 代码部署成功！接下来开始初始化数据库环境...'])
+          setDeployLogs((prev) => [...prev, '正在准备 D1 数据库执行写入 (schema.sql)...'])
+          
           const runMigration = (): Promise<void> => {
             return new Promise<void>((resolve, reject) => {
               window.api.wrangler.onStdout((data) => {
@@ -172,7 +182,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
             setDeployStatus('success')
             setDeployLogs((prev) => [...prev, '🎉 部署完全成功！所有数据表已初始化。'])
 
-            // 6. Save Deployment History
+            // Save Deployment History
             const history = JSON.parse(localStorage.getItem('deploy_history') || '[]')
             const newEntry = {
               name: configFields.name,
@@ -185,14 +195,22 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
             }
             localStorage.setItem('deploy_history', JSON.stringify([newEntry, ...history]))
           } catch (mErr: any) {
-            setDeployLogs((prev) => [...prev, `[错误] ${mErr.message || String(mErr)}`])
-            setDeployLogs((prev) => [...prev, `提示: 检查项目目录下是否存在 schema.sql 文件。更多说明请访问: ${HELP_URL}`])
+            setDeployLogs((prev) => [
+              ...prev, 
+              `[DB FAILURE] 数据库写入失败: ${mErr.message || String(mErr)}`,
+              '可能原因: 1. 数据库权限不足 2. schema.sql 文件不存在。',
+              `请访问帮助中心查看配置指南: ${HELP_URL}`
+            ])
             setDeployStatus('failure')
           }
         } else {
           setDeployStatus('failure')
-          setDeployLogs((prev) => [...prev, `部署终止，退出码: ${code}`])
-          setDeployLogs((prev) => [...prev, `如有疑问请访问帮助中心: ${HELP_URL}`])
+          setDeployLogs((prev) => [
+            ...prev, 
+            `代码部署终止，退出码: ${code}`,
+            '请检查控制台日志以获取更多详细错误信息。',
+            `如有疑问请访问帮助中心: ${HELP_URL}`
+          ])
         }
       })
 
@@ -292,9 +310,9 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-10 px-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
+    <div className="flex-1 flex flex-col h-full overflow-hidden animate-in fade-in duration-700 max-w-5xl mx-auto w-full px-6 py-6 min-h-0">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-6">
           <button
             onClick={onBack}
@@ -618,7 +636,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
               )}
             </div>
 
-            <div className="p-8 h-[350px] overflow-y-auto font-mono text-xs space-y-2 custom-scrollbar scroll-smooth">
+            <div ref={consoleRef} className="p-8 h-[350px] overflow-y-auto font-mono text-xs space-y-2 custom-scrollbar scroll-smooth">
               {deployLogs.map((log, i) => (
                 <div
                   key={i}
