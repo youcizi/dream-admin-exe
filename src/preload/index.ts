@@ -93,7 +93,11 @@ const api = {
     deleteR2Object: (apiToken: string, accountId: string, bucketName: string, key: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:deleteR2Object', apiToken, accountId, bucketName, key),
     uploadR2Object: (apiToken: string, accountId: string, bucketName: string, key: string, filePath: string) =>
-      electronAPI.ipcRenderer.invoke('cloudflare:uploadR2Object', apiToken, accountId, bucketName, key, filePath)
+      electronAPI.ipcRenderer.invoke('cloudflare:uploadR2Object', apiToken, accountId, bucketName, key, filePath),
+    getWorkerBindings: (apiToken: string, accountId: string, scriptName: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:getWorkerBindings', apiToken, accountId, scriptName),
+    updateWorkerVar: (apiToken: string, accountId: string, scriptName: string, name: string, value: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:updateWorkerVar', apiToken, accountId, scriptName, name, value)
   },
   openExternal: (url: string) => electronAPI.ipcRenderer.invoke('shell:openExternal', url),
   openDeploy: () => electronAPI.ipcRenderer.send('window:open-deploy')

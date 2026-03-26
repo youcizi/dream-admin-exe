@@ -399,4 +399,31 @@ export function setupDeployHandlers(): void {
       return res.data
     }
   )
+
+  ipcMain.handle(
+    'cloudflare:getWorkerBindings',
+    async (_event, apiToken: string, accountId: string, scriptName: string) => {
+      const res = await axios.get(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${scriptName}/bindings`,
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data.result
+    }
+  )
+
+  ipcMain.handle(
+    'cloudflare:updateWorkerVar',
+    async (_event, apiToken: string, accountId: string, scriptName: string, name: string, value: string) => {
+      // For single variable update, we can use the Secrets API if it's a secret, 
+      // or we must update the whole script metadata if it's a plain text var.
+      // However, the "Secrets" API is simpler and safer for things like CAPTCHA tokens.
+      // Cloudflare PUT /accounts/:account_id/workers/scripts/:script_name/secrets
+      const res = await axios.put(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${scriptName}/secrets`,
+        { name, text: value, type: 'secret_text' },
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data
+    }
+  )
 }

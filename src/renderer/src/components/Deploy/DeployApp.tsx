@@ -8,6 +8,7 @@ import DeployConfigModal from './DeployConfigModal'
 import DeployProcess from './DeployProcess'
 import D1Viewer from './D1Viewer'
 import { R2Viewer } from './R2Viewer'
+import WorkerConfigModal from './WorkerConfigModal'
 
 interface DeploymentRecord {
   name: string
@@ -46,6 +47,9 @@ const DeployApp: React.FC = () => {
   
   const [selectedR2, setSelectedR2] = useState<R2Bucket | null>(null)
   const [isR2ViewerOpen, setIsR2ViewerOpen] = useState(false)
+  
+  const [selectedWorker, setSelectedWorker] = useState<{ id: string; name: string } | null>(null)
+  const [isWorkerModalOpen, setIsWorkerModalOpen] = useState(false)
   
   interface PagesProject {
     id: string
@@ -416,11 +420,25 @@ const DeployApp: React.FC = () => {
                               <div key={worker.id} className="group bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all flex flex-col justify-between h-full">
                                 <div>
                                   <div className="flex items-center gap-4 mb-6">
-                                    <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-primary shadow-inner">
+                                    <div 
+                                      className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-primary shadow-inner cursor-pointer hover:bg-indigo-100 transition-colors"
+                                      onClick={() => {
+                                        setSelectedWorker({ id: worker.id, name: worker.name })
+                                        setIsWorkerModalOpen(true)
+                                      }}
+                                    >
                                       <Settings size={22} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <h3 className="text-sm font-black text-slate-900 truncate">{worker.id || worker.name}</h3>
+                                      <h3 
+                                        className="text-sm font-black text-slate-900 truncate cursor-pointer hover:text-primary transition-colors"
+                                        onClick={() => {
+                                          setSelectedWorker({ id: worker.id, name: worker.name })
+                                          setIsWorkerModalOpen(true)
+                                        }}
+                                      >
+                                        {worker.id || worker.name}
+                                      </h3>
                                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Workers 应用</p>
                                     </div>
                                   </div>
@@ -988,6 +1006,13 @@ const DeployApp: React.FC = () => {
         bucketName={selectedR2?.name || ''}
         config={config}
       />
+      <WorkerConfigModal
+        isOpen={isWorkerModalOpen}
+        onClose={() => setIsWorkerModalOpen(false)}
+        worker={selectedWorker}
+        config={config}
+        resources={resources}
+      />
     </div>
   )
 }
@@ -1137,7 +1162,7 @@ const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
           <p className="text-[10px] font-medium text-slate-400">
             绑定域名后，请确保在 Cloudflare DNS 中配置了正确的 CNAME 记录。
           </p>
-        </div>
+    </div>
       </div>
     </div>
   )

@@ -57,6 +57,8 @@ declare global {
         listR2Objects: (apiToken: string, accountId: string, bucketName: string, prefix?: string) => Promise<any>
         deleteR2Object: (apiToken: string, accountId: string, bucketName: string, key: string) => Promise<any>
         uploadR2Object: (apiToken: string, accountId: string, bucketName: string, key: string, filePath: string) => Promise<any>
+        getWorkerBindings: (apiToken: string, accountId: string, scriptName: string) => Promise<any[]>
+        updateWorkerVar: (apiToken: string, accountId: string, scriptName: string, name: string, value: string) => Promise<any>
       }
       openDeploy: () => void
     }
