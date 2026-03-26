@@ -7,6 +7,7 @@ import {
 import DeployConfigModal from './DeployConfigModal'
 import DeployProcess from './DeployProcess'
 import D1Viewer from './D1Viewer'
+import { R2Viewer } from './R2Viewer'
 
 interface DeploymentRecord {
   name: string
@@ -40,6 +41,9 @@ const DeployApp: React.FC = () => {
   
   const [selectedD1, setSelectedD1] = useState<D1Database | null>(null)
   const [isD1ViewerOpen, setIsD1ViewerOpen] = useState(false)
+  
+  const [selectedR2, setSelectedR2] = useState<R2Bucket | null>(null)
+  const [isR2ViewerOpen, setIsR2ViewerOpen] = useState(false)
   
   interface PagesProject {
     id: string
@@ -659,12 +663,26 @@ const DeployApp: React.FC = () => {
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {resources.r2.map((bucket: R2Bucket) => (
-                              <div key={bucket.name} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-4">
-                                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400">
+                              <div key={bucket.name} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:border-primary/20">
+                                <div 
+                                  className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 cursor-pointer hover:bg-emerald-50 hover:text-emerald-500 transition-all"
+                                  onClick={() => {
+                                    setSelectedR2(bucket)
+                                    setIsR2ViewerOpen(true)
+                                  }}
+                                >
                                   <Cloud size={22} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h3 className="text-[13px] font-black text-slate-800 truncate leading-tight mb-1">{bucket.name}</h3>
+                                  <h3 
+                                    className="text-[13px] font-black text-slate-800 truncate leading-tight mb-1 cursor-pointer hover:text-emerald-500 transition-colors"
+                                    onClick={() => {
+                                      setSelectedR2(bucket)
+                                      setIsR2ViewerOpen(true)
+                                    }}
+                                  >
+                                    {bucket.name}
+                                  </h3>
                                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">R2 Bucket</p>
                                 </div>
                                 <button
@@ -988,6 +1006,12 @@ const DeployApp: React.FC = () => {
         database={selectedD1}
         config={config}
       />
+      <R2Viewer
+        isOpen={isR2ViewerOpen}
+        onClose={() => setIsR2ViewerOpen(false)}
+        bucketName={selectedR2?.name || ''}
+        config={config}
+      />
     </div>
   )
 }
@@ -1019,6 +1043,7 @@ const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
       }, 100)
       return () => clearTimeout(timer)
     }
+    return undefined
   }, [isOpen])
 
   if (!isOpen) return null

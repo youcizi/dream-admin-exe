@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import { join } from 'path'
 import axios from 'axios'
+import fs from 'fs'
 
 export function setupDeployHandlers(): void {
   let deployWindow: BrowserWindow | null = null
@@ -350,6 +351,50 @@ export function setupDeployHandlers(): void {
         `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
         { sql },
         { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data
+    }
+  )
+
+  // R2 Object Management
+  ipcMain.handle(
+    'cloudflare:listR2Objects',
+    async (_event, apiToken: string, accountId: string, bucketName: string, prefix: string = '') => {
+      const res = await axios.get(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucketName}/objects`,
+        { 
+          params: { prefix, delimiter: '/' },
+          headers: { Authorization: `Bearer ${apiToken}` } 
+        }
+      )
+      return res.data
+    }
+  )
+
+  ipcMain.handle(
+    'cloudflare:deleteR2Object',
+    async (_event, apiToken: string, accountId: string, bucketName: string, key: string) => {
+      const res = await axios.delete(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucketName}/objects/${key}`,
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data
+    }
+  )
+
+  ipcMain.handle(
+    'cloudflare:uploadR2Object',
+    async (_event, apiToken: string, accountId: string, bucketName: string, key: string, filePath: string) => {
+      const buffer = fs.readFileSync(filePath)
+      const res = await axios.put(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucketName}/objects/${key}`,
+        buffer,
+        { 
+          headers: { 
+            Authorization: `Bearer ${apiToken}`,
+            'Content-Type': 'application/octet-stream' // or detected mime
+          } 
+        }
       )
       return res.data
     }

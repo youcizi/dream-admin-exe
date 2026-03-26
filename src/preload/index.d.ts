@@ -48,6 +48,10 @@ declare global {
         deleteWorkerDomain: (apiToken: string, accountId: string, domainId: string) => Promise<any>
         createDNSRecord: (apiToken: string, zoneId: string, type: string, name: string, content: string, proxied?: boolean) => Promise<any>
         getDNSRecords: (apiToken: string, zoneId: string, domainName: string) => Promise<any>
+        queryD1: (apiToken: string, accountId: string, databaseId: string, sql: string) => Promise<any>
+        listR2Objects: (apiToken: string, accountId: string, bucketName: string, prefix?: string) => Promise<any>
+        deleteR2Object: (apiToken: string, accountId: string, bucketName: string, key: string) => Promise<any>
+        uploadR2Object: (apiToken: string, accountId: string, bucketName: string, key: string, filePath: string) => Promise<any>
       }
       openExternal: (url: string) => Promise<void>
       openDeploy: () => void

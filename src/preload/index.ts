@@ -81,7 +81,13 @@ const api = {
     getDNSRecords: (apiToken: string, zoneId: string, domainName: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:getDNSRecords', apiToken, zoneId, domainName),
     queryD1: (apiToken: string, accountId: string, databaseId: string, sql: string) =>
-      electronAPI.ipcRenderer.invoke('cloudflare:queryD1', apiToken, accountId, databaseId, sql)
+      electronAPI.ipcRenderer.invoke('cloudflare:queryD1', apiToken, accountId, databaseId, sql),
+    listR2Objects: (apiToken: string, accountId: string, bucketName: string, prefix?: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:listR2Objects', apiToken, accountId, bucketName, prefix),
+    deleteR2Object: (apiToken: string, accountId: string, bucketName: string, key: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:deleteR2Object', apiToken, accountId, bucketName, key),
+    uploadR2Object: (apiToken: string, accountId: string, bucketName: string, key: string, filePath: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:uploadR2Object', apiToken, accountId, bucketName, key, filePath)
   },
   openExternal: (url: string) => electronAPI.ipcRenderer.invoke('shell:openExternal', url),
   openDeploy: () => electronAPI.ipcRenderer.send('window:open-deploy')
