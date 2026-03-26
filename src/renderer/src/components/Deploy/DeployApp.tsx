@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { 
   Plus, History, Cloud, Settings, ExternalLink, ShieldCheck, Zap, 
-  RefreshCw, XCircle, ChevronRight, Globe, Database, Trash2, AlertTriangle 
+  RefreshCw, XCircle, ChevronRight, Globe, Database, Trash2, AlertTriangle,
+  Copy, Check
 } from 'lucide-react'
 import DeployConfigModal from './DeployConfigModal'
 import DeployProcess from './DeployProcess'
@@ -23,6 +24,13 @@ const DeployApp: React.FC = () => {
   const [history, setHistory] = useState<DeploymentRecord[]>([])
   const [isVerifying, setIsVerifying] = useState(false)
   const [verifyStatus, setVerifyStatus] = useState<'success' | 'failure' | null>(null)
+  const [copySuccess, setCopySuccess] = useState<string | null>(null)
+
+  const handleCopy = (text: string, id: string): void => {
+    navigator.clipboard.writeText(text)
+    setCopySuccess(id)
+    setTimeout(() => setCopySuccess(null), 2000)
+  }
   const [activeTab, setActiveTab] = useState<'deploy' | 'frontend' | 'backend' | 'data' | 'history'>('deploy')
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false)
   const [resourceModalType, setResourceModalType] = useState<'d1' | 'r2' | null>(null)
@@ -523,18 +531,31 @@ const DeployApp: React.FC = () => {
                                   <h3 className="text-[13px] font-black text-slate-800 truncate leading-tight mb-1">{db.name}</h3>
                                   <p className="text-[9px] font-bold text-slate-400 font-mono tracking-tighter truncate">{db.uuid}</p>
                                 </div>
-                                <button
-                                  onClick={() => {
-                                    if (confirm('确定要删除此数据库吗？')) {
-                                      window.api.cloudflare.deleteD1(config.apiToken, config.accountId, db.uuid)
-                                        .then(() => fetchResources())
-                                        .catch((err: any) => alert('删除失败: ' + err.message))
-                                    }
-                                  }}
-                                  className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
+                                <div className="flex flex-col gap-2">
+                                  <button
+                                    onClick={() => handleCopy(db.uuid, db.uuid)}
+                                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                                      copySuccess === db.uuid 
+                                        ? 'bg-emerald-50 text-emerald-500' 
+                                        : 'text-slate-300 hover:text-primary hover:bg-slate-50'
+                                    }`}
+                                    title="复制数据库 ID"
+                                  >
+                                    {copySuccess === db.uuid ? <Check size={14} /> : <Copy size={14} />}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm('确定要删除此数据库吗？')) {
+                                        window.api.cloudflare.deleteD1(config!.apiToken, config!.accountId, db.uuid)
+                                          .then(() => fetchResources())
+                                          .catch((err: any) => alert('删除失败: ' + err.message))
+                                      }
+                                    }}
+                                    className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -644,15 +665,15 @@ const DeployApp: React.FC = () => {
                                   </div>
                                 </div>
                                 <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
-                                  <a
-                                    href={item.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-[10px] text-primary font-black uppercase tracking-widest flex items-center gap-1 hover:underline"
-                                    onClick={(e) => e.stopPropagation()}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      window.api.openExternal(item.url)
+                                    }}
+                                    className="text-[10px] text-primary font-black uppercase tracking-widest flex items-center gap-1 hover:underline bg-transparent border-none p-0 cursor-pointer"
                                   >
                                     访问地址 <ExternalLink size={10} />
-                                  </a>
+                                  </button>
                                   <button
                                     onClick={() => handleDeleteHistoryItem(index)}
                                     className="p-2 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"

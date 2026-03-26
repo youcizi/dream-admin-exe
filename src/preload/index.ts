@@ -20,7 +20,13 @@ const api = {
     readConfig: (projectPath: string) =>
       electronAPI.ipcRenderer.invoke('wrangler:readConfig', projectPath),
     saveConfig: (projectPath: string, content: string) =>
-      electronAPI.ipcRenderer.invoke('wrangler:saveConfig', projectPath, content)
+      electronAPI.ipcRenderer.invoke('wrangler:saveConfig', projectPath, content),
+    removeAllListeners: () => {
+      electronAPI.ipcRenderer.removeAllListeners('wrangler-stdout')
+      electronAPI.ipcRenderer.removeAllListeners('wrangler-stderr')
+      electronAPI.ipcRenderer.removeAllListeners('wrangler-close')
+      electronAPI.ipcRenderer.removeAllListeners('wrangler-error')
+    }
   },
   project: {
     openDirectory: () => electronAPI.ipcRenderer.invoke('dialog:openDirectory'),

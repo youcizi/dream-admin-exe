@@ -132,12 +132,18 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
       // 4. Run Wrangler Deploy
       setDeployLogs((prev) => [...prev, '正在启动部署命令: npx wrangler deploy...'])
 
+      // 清除旧的监听器，防止多开
+      window.api.wrangler.removeAllListeners()
+      
+      let capturedUrl = ''
+
       window.api.wrangler.onStdout((data) => {
         setDeployLogs((prev) => [...prev, data])
-        // Extract domain from output
-        const domainMatch = data.match(/https:\/\/(.*\.workers\.dev)/)
-        if (domainMatch) {
-          setDeployedUrl(domainMatch[0])
+        // 捕获部署后的 URL 地址
+        const urlMatch = data.match(/https:\/\/[a-zA-Z0-9.-]+\.(pages\.dev|workers\.dev)/)
+        if (urlMatch) {
+          capturedUrl = urlMatch[0]
+          setDeployedUrl(urlMatch[0])
         }
       })
 
@@ -151,6 +157,8 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
       })
 
       window.api.wrangler.onClose(async (code) => {
+        window.api.wrangler.removeAllListeners()
+
         if (code === 0) {
           setDeployLogs((prev) => [...prev, '[SUCCESS] 代码部署成功！接下来开始初始化数据库环境...'])
           setDeployLogs((prev) => [...prev, '正在准备 D1 数据库执行写入 (schema.sql)...'])
@@ -164,6 +172,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                 setDeployLogs((prev) => [...prev, `[DB ERR] ${data}`])
               })
               window.api.wrangler.onClose((mCode) => {
+                window.api.wrangler.removeAllListeners()
                 if (mCode === 0) {
                   resolve()
                 } else {
@@ -184,10 +193,11 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
 
             // Save Deployment History
             const history = JSON.parse(localStorage.getItem('deploy_history') || '[]')
+            const finalUrl = capturedUrl || deployedUrl
             const newEntry = {
               name: configFields.name,
               type: type,
-              url: deployedUrl,
+              url: finalUrl,
               d1Id: resources.d1Id,
               d1Name: configFields.database_name,
               r2Name: configFields.bucket_name,
