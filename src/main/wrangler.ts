@@ -137,4 +137,15 @@ export function setupWranglerHandlers(): void {
     fs.writeFileSync(configPath, content, 'utf-8')
     return true
   })
+
+  ipcMain.handle('wrangler:listMigrations', async (_event, projectPath: string) => {
+    if (!fs.existsSync(projectPath)) return []
+    try {
+      const files = fs.readdirSync(projectPath)
+      return files.filter((f) => f.endsWith('.sql') && f !== 'schema.sql')
+    } catch (error) {
+      console.error('List migrations error:', error)
+      return []
+    }
+  })
 }

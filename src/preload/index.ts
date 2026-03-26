@@ -21,6 +21,8 @@ const api = {
       electronAPI.ipcRenderer.invoke('wrangler:readConfig', projectPath),
     saveConfig: (projectPath: string, content: string) =>
       electronAPI.ipcRenderer.invoke('wrangler:saveConfig', projectPath, content),
+    listMigrations: (projectPath: string) =>
+      electronAPI.ipcRenderer.invoke('wrangler:listMigrations', projectPath),
     removeAllListeners: () => {
       electronAPI.ipcRenderer.removeAllListeners('wrangler-stdout')
       electronAPI.ipcRenderer.removeAllListeners('wrangler-stderr')

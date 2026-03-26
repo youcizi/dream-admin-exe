@@ -13,6 +13,8 @@ interface Window {
       scanProjects: (rootPath: string) => Promise<any[]>
       readConfig: (projectPath: string) => Promise<string>
       saveConfig: (projectPath: string, content: string) => Promise<boolean>
+      listMigrations: (projectPath: string) => Promise<string[]>
+      removeAllListeners: () => void
     }
     crawler: {
       crawl: (url: string) => Promise<any>
@@ -20,7 +22,12 @@ interface Window {
     project: {
       openDirectory: () => Promise<string | null>
       downloadAndExtract: (url: string, baseDir: string) => Promise<string>
-    },
+      saveFile: (content: string, defaultName: string) => Promise<string | null>
+    }
+    shell: {
+      openExternal: (url: string) => Promise<void>
+      openPath: (path: string) => Promise<void>
+    }
     auth: {
       openLogin: (url: string) => Promise<string | null>
     }
@@ -39,6 +46,7 @@ interface Window {
       addWorkerDomain: (apiToken: string, accountId: string, service: string, hostname: string, zoneId: string) => Promise<any>
       deleteWorker: (apiToken: string, accountId: string, scriptName: string) => Promise<any>
       getWorkerSubdomain: (apiToken: string, accountId: string) => Promise<string>
+      renameD1: (apiToken: string, accountId: string, databaseId: string, name: string) => Promise<any>
       deleteD1: (apiToken: string, accountId: string, databaseId: string) => Promise<any>
       createD1: (apiToken: string, accountId: string, name: string) => Promise<any>
       createR2: (apiToken: string, accountId: string, name: string) => Promise<any>
@@ -48,6 +56,12 @@ interface Window {
       deleteWorkerDomain: (apiToken: string, accountId: string, domainId: string) => Promise<any>
       createDNSRecord: (apiToken: string, zoneId: string, type: string, name: string, content: string, proxied?: boolean) => Promise<any>
       getDNSRecords: (apiToken: string, zoneId: string, domainName: string) => Promise<any[]>
+      queryD1: (apiToken: string, accountId: string, databaseId: string, sql: string) => Promise<any>
+      listR2Objects: (apiToken: string, accountId: string, bucketName: string, prefix?: string) => Promise<any>
+      deleteR2Object: (apiToken: string, accountId: string, bucketName: string, key: string) => Promise<any>
+      uploadR2Object: (apiToken: string, accountId: string, bucketName: string, key: string, filePath: string) => Promise<any>
+      getWorkerBindings: (apiToken: string, accountId: string, scriptName: string) => Promise<any[]>
+      updateWorkerVar: (apiToken: string, accountId: string, scriptName: string, name: string, value: string) => Promise<any>
     }
     openExternal: (url: string) => Promise<void>
     openDeploy: () => void
