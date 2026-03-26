@@ -112,8 +112,11 @@ const WorkerConfigModal: React.FC<WorkerConfigModalProps> = ({
     : '未绑定'
   
   const r2Name = r2Binding 
-    ? (resources.r2.find(b => b.name === r2Binding.bucket_name)?.name || r2Binding.bucket_name)
+    ? (resources.r2.find((b: any) => b.name === r2Binding.bucket_name)?.name || r2Binding.bucket_name)
     : '未绑定'
+
+  // Detect if it's a Dream Admin project
+  const isDreamAdmin = bindings.some(b => b.name === 'CF_ADMIN_CAPTCHA')
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
@@ -140,69 +143,90 @@ const WorkerConfigModal: React.FC<WorkerConfigModalProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 pt-4 space-y-8">
-          {/* Admin Info Box */}
-          <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-3xl flex gap-4">
-            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-sm shrink-0">
-              <ShieldCheck size={20} />
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
+              <RefreshCw size={24} className="animate-spin" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">正在加载配置...</span>
             </div>
-            <div>
-              <h3 className="text-sm font-black text-indigo-900 mb-1">初始管理员设置</h3>
-              <p className="text-[11px] font-bold text-indigo-700/70 leading-relaxed">
-                默认用户名: <span className="text-indigo-900 font-black">admin</span><br />
-                默认密码: <span className="text-indigo-900 font-black">admin123</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Captcha Configuration */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">后台验证码 (CF_ADMIN_CAPTCHA)</span>
-                <div className="group relative">
-                  <AlertCircle size={12} className="text-slate-300 cursor-help" />
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-900 text-white text-[9px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 text-center font-bold">
-                    用于保护后台登录入口。保存后将作为 Secret 写入 Cloudflare。
-                  </div>
+          ) : isDreamAdmin ? (
+            <>
+              {/* Admin Info Box */}
+              <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-3xl flex gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-sm shrink-0">
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-indigo-900 mb-1">初始管理员设置</h3>
+                  <p className="text-[11px] font-bold text-indigo-700/70 leading-relaxed">
+                    默认用户名: <span className="text-indigo-900 font-black">admin</span><br />
+                    默认密码: <span className="text-indigo-900 font-black">admin123</span>
+                  </p>
                 </div>
               </div>
-            </div>
 
-            <div className="flex gap-3">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={captcha}
-                  onChange={(e) => setCaptcha(e.target.value)}
-                  placeholder={loading ? "正在加载..." : "输入新验证码..."}
-                  disabled={loading}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold font-mono focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all pr-12"
-                />
+              {/* Captcha Configuration */}
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-6 duration-700">
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">后台验证码 (CF_ADMIN_CAPTCHA)</span>
+                    <div className="group relative">
+                      <AlertCircle size={12} className="text-slate-300 cursor-help" />
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-900 text-white text-[9px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 text-center font-bold">
+                        用于保护后台登录入口。保存后将作为 Secret 写入 Cloudflare。
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={captcha}
+                      onChange={(e) => setCaptcha(e.target.value)}
+                      placeholder={loading ? "正在加载..." : "输入新验证码..."}
+                      disabled={loading}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold font-mono focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all pr-12"
+                    />
+                    <button
+                      onClick={() => handleCopy(captcha, 'captcha')}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-primary transition-colors"
+                    >
+                      {copySuccess === 'captcha' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                    </button>
+                  </div>
+                  <button
+                    onClick={generateRandomCaptcha}
+                    title="生成随机预览"
+                    className="w-14 h-14 bg-white border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 hover:text-primary hover:border-primary/20 hover:shadow-lg transition-all active:scale-95 shadow-sm"
+                  >
+                    <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+                  </button>
+                </div>
+
                 <button
-                  onClick={() => handleCopy(captcha, 'captcha')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-primary transition-colors"
+                  onClick={handleSave}
+                  disabled={saving || !captcha || captcha === '********'}
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {copySuccess === 'captcha' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                  {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                  保存配置到云端
                 </button>
               </div>
-              <button
-                onClick={generateRandomCaptcha}
-                title="生成随机预览"
-                className="w-14 h-14 bg-white border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 hover:text-primary hover:border-primary/20 hover:shadow-lg transition-all active:scale-95 shadow-sm"
-              >
-                <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-              </button>
+            </>
+          ) : (
+            <div className="py-12 px-10 border-2 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center text-center space-y-4 animate-in zoom-in-95 duration-500">
+              <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200">
+                <ShieldCheck size={32} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">非 Dream Admin 后台</h3>
+                <p className="text-[11px] font-bold text-slate-300 leading-relaxed max-w-[240px]">
+                  未检测到验证码变量，已隐藏系统设置。当前仅支持基础资源查看。
+                </p>
+              </div>
             </div>
-
-            <button
-              onClick={handleSave}
-              disabled={saving || !captcha || captcha === '********'}
-              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-              保存配置到云端
-            </button>
-          </div>
+          )}
 
           {/* Associated Resources */}
           <div className="space-y-4 pt-4 border-t border-slate-50">
