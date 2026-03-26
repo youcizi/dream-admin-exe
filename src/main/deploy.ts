@@ -115,26 +115,49 @@ export function setupDeployHandlers(): void {
   ipcMain.handle('cloudflare:listResources', async (_event, apiToken, accountId) => {
     try {
       const headers = { Authorization: `Bearer ${apiToken}` }
-      const [d1Res, r2Res, pagesRes, workersRes] = await Promise.all([
-        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database`, {
-          headers
-        }),
-        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets`, {
-          headers
-        }),
-        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`, {
-          headers
-        }),
-        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`, {
-          headers
-        })
+      // 1. Fetch base resources
+      const [d1Res, r2Res, pagesRes, workersRes, workersDomainsRes, workersSubdomainRes] = await Promise.all([
+        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database`, { headers }),
+        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets`, { headers }),
+        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`, { headers }),
+        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`, { headers }),
+        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/domains`, { headers }),
+        axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`, { headers })
       ])
+
+      const pages = pagesRes.data.result || []
+      const workers = workersRes.data.result || []
+      const workerDomains = workersDomainsRes.data.result || []
+      const workerSubdomain = workersSubdomainRes.data.result?.subdomain || ''
+
+      // 2. Fetch domains for each Pages project
+      const pagesWithDomains = await Promise.all(
+        pages.map(async (page: any) => {
+          try {
+            const domainRes = await axios.get(
+              `https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/${page.name}/domains`,
+              { headers }
+            )
+            return { ...page, domains: domainRes.data.result || [] }
+          } catch (e) {
+            return { ...page, domains: [] }
+          }
+        })
+      )
+
+      // 3. Map domains to Workers
+      const workersWithDomains = workers.map((worker: any) => {
+        const domains = workerDomains
+          .filter((d: any) => d.service === worker.id || d.service === worker.name)
+          .map((d: any) => ({ name: d.hostname, id: d.id }))
+        return { ...worker, domains, subdomain: workerSubdomain }
+      })
 
       return {
         d1: d1Res.data.result || [],
         r2: r2Res.data.result?.buckets || [],
-        pages: pagesRes.data.result || [],
-        workers: workersRes.data.result || []
+        pages: pagesWithDomains,
+        workers: workersWithDomains
       }
     } catch (error: any) {
       console.error('List resources error:', error.response?.data || error.message)

@@ -40,13 +40,15 @@ const DeployApp: React.FC = () => {
   interface PagesProject {
     id: string
     name: string
-    domains: string[]
+    domains: { name: string }[]
   }
 
   interface WorkerService {
     id: string
     name: string
     modified_on: string
+    domains: { name: string; id: string }[]
+    subdomain?: string
   }
 
   interface D1Database {
@@ -396,7 +398,7 @@ const DeployApp: React.FC = () => {
                         <div className="flex items-end justify-between px-2">
                           <div>
                             <h2 className="text-2xl font-black text-slate-900 tracking-tight">后端应用</h2>
-                            <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">您的 Cloudflare Workers 服务列表</p>
+                            <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">您的 Cloudflare Workers 应用列表</p>
                           </div>
                           <div className="flex items-center gap-6">
                             <button 
@@ -414,30 +416,52 @@ const DeployApp: React.FC = () => {
 
                         {/* Resource Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                          {resources.workers.map((worker: WorkerService) => (
-                            <div key={worker.id} className="group bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all">
-                              <div className="flex items-center gap-4 mb-6">
-                                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-primary shadow-inner">
-                                  <Settings size={22} />
+                          {resources.workers.map((worker: WorkerService) => {
+                            const customDomain = worker.domains?.[0]?.name
+                            const defaultDomain = worker.subdomain ? `${worker.name}.${worker.subdomain}.workers.dev` : null
+                            const displayDomain = customDomain || defaultDomain
+
+                            return (
+                              <div key={worker.id} className="group bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all flex flex-col justify-between h-full">
+                                <div>
+                                  <div className="flex items-center gap-4 mb-6">
+                                    <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-primary shadow-inner">
+                                      <Settings size={22} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <h3 className="text-sm font-black text-slate-900 truncate">{worker.name}</h3>
+                                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Workers 应用</p>
+                                    </div>
+                                  </div>
+
+                                  {displayDomain && (
+                                    <div className="mb-6 px-1">
+                                      <button 
+                                        onClick={() => window.api.openExternal(`https://${displayDomain}`)}
+                                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-primary hover:bg-white hover:border-primary/30 transition-all group/link"
+                                      >
+                                        <Globe size={12} className="text-slate-400 group-hover/link:text-primary transition-colors" />
+                                        <span className="text-[11px] font-black truncate max-w-[150px] tracking-tight">{displayDomain}</span>
+                                        <ExternalLink size={10} className="text-slate-300 group-hover/link:text-primary transition-colors" />
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="text-sm font-black text-slate-900 truncate">{worker.name}</h3>
-                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Worker Script</p>
+
+                                <div className="flex items-center justify-between pt-4 border-t border-slate-50 mt-auto">
+                                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter bg-emerald-50 text-emerald-500`}>
+                                    Active
+                                  </span>
+                                  <button 
+                                    onClick={() => handleOpenDomainModal('worker', worker.name)}
+                                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                                  >
+                                    域名管理
+                                  </button>
                                 </div>
                               </div>
-                              <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter bg-emerald-50 text-emerald-500`}>
-                                  Active
-                                </span>
-                                <button 
-                                  onClick={() => handleOpenDomainModal('worker', worker.name)}
-                                  className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
-                                >
-                                  域名绑定
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     )}
@@ -448,7 +472,7 @@ const DeployApp: React.FC = () => {
                         <div className="flex items-end justify-between px-2">
                           <div>
                             <h2 className="text-2xl font-black text-slate-900 tracking-tight">前端应用</h2>
-                            <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">您的 Cloudflare Pages 项目列表</p>
+                            <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">您的 Cloudflare Pages 应用列表</p>
                           </div>
                           <div className="flex items-center gap-6">
                             <button 
@@ -465,30 +489,52 @@ const DeployApp: React.FC = () => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                          {resources.pages.map((page: PagesProject) => (
-                            <div key={page.id} className="group bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all">
-                              <div className="flex items-center gap-4 mb-6">
-                                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-500 shadow-inner">
-                                  <Zap size={22} />
+                          {resources.pages.map((page: PagesProject) => {
+                            const customDomain = page.domains?.find((d: any) => !d.name.endsWith('.pages.dev'))?.name
+                            const defaultDomain = `${page.name}.pages.dev`
+                            const displayDomain = customDomain || defaultDomain
+
+                            return (
+                              <div key={page.id} className="group bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all flex flex-col justify-between h-full">
+                                <div>
+                                  <div className="flex items-center gap-4 mb-6">
+                                    <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-500 shadow-inner">
+                                      <Zap size={22} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <h3 className="text-sm font-black text-slate-900 truncate">{page.name}</h3>
+                                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pages 应用</p>
+                                    </div>
+                                  </div>
+
+                                  {displayDomain && (
+                                    <div className="mb-6 px-1">
+                                      <button 
+                                        onClick={() => window.api.openExternal(`https://${displayDomain}`)}
+                                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-emerald-600 hover:bg-white hover:border-emerald-300/50 transition-all group/link"
+                                      >
+                                        <Globe size={12} className="text-slate-400 group-hover/link:text-emerald-500 transition-colors" />
+                                        <span className="text-[11px] font-black truncate max-w-[150px] tracking-tight">{displayDomain}</span>
+                                        <ExternalLink size={10} className="text-slate-300 group-hover/link:text-emerald-500 transition-colors" />
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="text-sm font-black text-slate-900 truncate">{page.name}</h3>
-                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pages Project</p>
+
+                                <div className="flex items-center justify-between pt-4 border-t border-slate-50 mt-auto">
+                                  <span className="px-3 py-1 bg-emerald-50 text-emerald-500 rounded-full text-[10px] font-black uppercase tracking-tighter">
+                                    Active
+                                  </span>
+                                  <button 
+                                    onClick={() => handleOpenDomainModal('page', page.name)}
+                                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                                  >
+                                    域名管理
+                                  </button>
                                 </div>
                               </div>
-                              <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                                <span className="px-3 py-1 bg-emerald-50 text-emerald-500 rounded-full text-[10px] font-black uppercase tracking-tighter">
-                                  Active
-                                </span>
-                                <button 
-                                  onClick={() => handleOpenDomainModal('page', page.name)}
-                                  className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
-                                >
-                                  域名绑定
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     )}
