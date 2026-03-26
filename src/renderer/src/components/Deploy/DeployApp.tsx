@@ -82,7 +82,14 @@ const DeployApp: React.FC = () => {
     // Load config
     const savedConfig = localStorage.getItem('cloudflare_config')
     if (savedConfig) {
-      setConfig(JSON.parse(savedConfig))
+      const parsed = JSON.parse(savedConfig)
+      // Only update if values are different to keep object identity stable
+      setConfig(prev => {
+        if (prev && prev.apiToken === parsed.apiToken && prev.accountId === parsed.accountId) {
+          return prev
+        }
+        return parsed
+      })
     }
 
     // Load history
@@ -911,7 +918,7 @@ const DeployApp: React.FC = () => {
                   value={newResourceName}
                   onChange={(e) => setNewResourceName(e.target.value)}
                   placeholder={`例如: my-dream-${resourceModalType}`}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all pointer-events-auto"
                   autoFocus
                 />
               </div>
@@ -978,6 +985,18 @@ interface DomainBindingModalProps {
 const DomainBindingModal: React.FC<DomainBindingModalProps> = ({ 
   isOpen, onClose, type, name, domains, loading, onAdd, onDelete, newDomain, setNewDomain, successMsg 
 }) => {
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
+  React.useEffect(() => {
+    if (isOpen) {
+      // 增加微小延迟以确保动画开始且 DOM 就绪
+      const timer = setTimeout(() => {
+        inputRef.current?.focus()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   return (
@@ -1055,7 +1074,9 @@ const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
                   placeholder="例如: example.com"
                   value={newDomain}
                   onChange={(e) => setNewDomain(e.target.value)}
-                  className="flex-1 px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all"
+                  ref={inputRef}
+                  autoFocus
+                  className="flex-1 px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all pointer-events-auto"
                 />
                 <button
                   onClick={onAdd}

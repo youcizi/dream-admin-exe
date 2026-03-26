@@ -6,6 +6,8 @@ const DeploySettings: React.FC = () => {
   const [accountId, setAccountId] = useState('')
   const [saved, setSaved] = useState(false)
 
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     const savedConfig = localStorage.getItem('cloudflare_config')
     if (savedConfig) {
@@ -13,6 +15,12 @@ const DeploySettings: React.FC = () => {
       setApiToken(t || '')
       setAccountId(a || '')
     }
+    
+    // 页面加载后自动聚焦
+    const timer = setTimeout(() => {
+      inputRef.current?.focus()
+    }, 300)
+    return () => clearTimeout(timer)
   }, [])
 
   const handleSave = () => {
@@ -51,11 +59,13 @@ const DeploySettings: React.FC = () => {
 
           <div className="space-y-2">
             <input
+              ref={inputRef}
               type="password"
               placeholder="请输入您的 API Token"
               value={apiToken}
               onChange={(e) => setApiToken(e.target.value)}
-              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all text-sm font-medium"
+              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all text-sm font-medium pointer-events-auto"
+              autoFocus
             />
             <p className="text-[11px] text-slate-400 px-2 italic">
               提示：请确保令牌具有访问 Pages, Workers 和 D1 的权限。

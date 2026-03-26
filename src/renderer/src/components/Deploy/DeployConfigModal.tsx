@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { X, Key, User, ExternalLink, Save, CheckCircle2, AlertCircle } from 'lucide-react'
 
 interface DeployConfigModalProps {
@@ -8,55 +8,41 @@ interface DeployConfigModalProps {
   initialConfig?: { apiToken: string; accountId: string }
 }
 
-const DeployConfigModal: React.FC<DeployConfigModalProps> = ({
-  isOpen,
-  onClose,
-  onSave,
-  initialConfig
-}) => {
+const DeployConfigModal: React.FC<DeployConfigModalProps> = ({ isOpen, onClose, onSave, initialConfig }) => {
   const [apiToken, setApiToken] = useState('')
   const [accountId, setAccountId] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (initialConfig) {
-      setApiToken(initialConfig.apiToken || '')
-      setAccountId(initialConfig.accountId || '')
+    if (isOpen) {
+      setApiToken(initialConfig?.apiToken || '')
+      setAccountId(initialConfig?.accountId || '')
+      
+      // 增加微小延迟以确保弹窗展开且 DOM 就位
+      const timer = setTimeout(() => {
+        inputRef.current?.focus()
+      }, 150)
+      return () => clearTimeout(timer)
     }
-  }, [initialConfig, isOpen])
+  }, [isOpen, initialConfig])
 
   if (!isOpen) return null
 
   const handleSave = async (): Promise<void> => {
     if (!apiToken || !accountId) {
       setError('请提供完整的 API Token 和 Account ID')
+      setError('请填完整配置信息')
       return
     }
     setError('')
-    setSaved(false)
-
-    try {
-      const data = await window.api.cloudflare.verifyToken(apiToken, accountId)
-
-      if (data.success) {
-        setSaved(true)
-        onSave({ apiToken, accountId })
-        setTimeout(() => {
-          setSaved(false)
-          onClose()
-        }, 1500)
-      } else {
-        const errorMsg = data.errors?.[0]?.message || '验证失败，请检查 API Token 和 Account ID'
-        setError(errorMsg)
-        // 无论成功还是失败都需要存储这两个信息
-        onSave({ apiToken, accountId })
-      }
-    } catch {
-      setError('网络请求失败，请稍后重试')
-      // 无论成功还是失败都需要存储这两个信息
-      onSave({ apiToken, accountId })
-    }
+    onSave({ apiToken, accountId })
+    setSaved(true)
+    setTimeout(() => {
+      setSaved(false)
+      onClose()
+    }, 1500)
   }
 
   return (
@@ -94,13 +80,15 @@ const DeployConfigModal: React.FC<DeployConfigModalProps> = ({
                 <Key size={14} className="text-indigo-500" />
                 Cloudflare API Token
               </label>
-              <input
-                type="password"
-                placeholder="在此输入您的 API Token"
-                value={apiToken}
-                onChange={(e) => setApiToken(e.target.value)}
-                className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
-              />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={apiToken}
+                  onChange={(e) => setApiToken(e.target.value)}
+                  placeholder="API Token (从 Cloudflare 控制台获取)"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all pointer-events-auto"
+                  autoFocus
+                />
             </div>
 
             {/* Account ID */}
