@@ -108,7 +108,7 @@ const WorkerConfigModal: React.FC<WorkerConfigModalProps> = ({
 
   // Map to friendly names
   const d1Name = d1Binding 
-    ? (resources.d1.find(db => db.id === d1Binding.database_id)?.name || d1Binding.database_name)
+    ? (resources.d1.find((db: any) => db.uuid === d1Binding.database_id)?.name || d1Binding.database_name)
     : '未绑定'
   
   const r2Name = r2Binding 
