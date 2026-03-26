@@ -23,8 +23,11 @@ const DeployApp: React.FC = () => {
   const [history, setHistory] = useState<DeploymentRecord[]>([])
   const [isVerifying, setIsVerifying] = useState(false)
   const [verifyStatus, setVerifyStatus] = useState<'success' | 'failure' | null>(null)
-
   const [activeTab, setActiveTab] = useState<'deploy' | 'frontend' | 'backend' | 'data' | 'history'>('deploy')
+  const [isResourceModalOpen, setIsResourceModalOpen] = useState(false)
+  const [resourceModalType, setResourceModalType] = useState<'d1' | 'r2' | null>(null)
+  const [newResourceName, setNewResourceName] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
   
   interface PagesProject {
     id: string
@@ -99,32 +102,42 @@ const DeployApp: React.FC = () => {
     }
   }, [activeTab, config, fetchResources])
 
-  const handleCreateD1 = async (): Promise<void> => {
-    if (!config) return
-    const name = prompt('请输入数据库名称 (例如: my-db):')
-    if (!name) return
+  const handleCreateD1 = (): void => {
+    setResourceModalType('d1')
+    setNewResourceName('')
+    setIsResourceModalOpen(true)
+  }
 
+  const handleCreateR2 = (): void => {
+    setResourceModalType('r2')
+    setNewResourceName('')
+    setIsResourceModalOpen(true)
+  }
+
+  const handleConfirmCreateResource = async (): Promise<void> => {
+    if (!config || !resourceModalType || !newResourceName) return
+    setIsCreating(true)
     try {
-      await window.api.cloudflare.createD1(config.apiToken, config.accountId, name)
-      alert('数据库创建成功')
+      if (resourceModalType === 'd1') {
+        await window.api.cloudflare.createD1(config.apiToken, config.accountId, newResourceName)
+      } else {
+        await window.api.cloudflare.createR2(config.apiToken, config.accountId, newResourceName)
+      }
+      setIsResourceModalOpen(false)
       fetchResources()
-    } catch (err: unknown) {
-      alert('创建失败: ' + (err instanceof Error ? err.message : String(err)))
+    } catch (err: any) {
+      alert('创建失败: ' + (err.message || String(err)))
+    } finally {
+      setIsCreating(false)
     }
   }
 
-  const handleCreateR2 = async (): Promise<void> => {
-    if (!config) return
-    const name = prompt('请输入存储桶名称 (例如: my-bucket):')
-    if (!name) return
-
-    try {
-      await window.api.cloudflare.createR2(config.apiToken, config.accountId, name)
-      alert('存储桶创建成功')
-      fetchResources()
-    } catch (err: unknown) {
-      alert('创建失败: ' + (err instanceof Error ? err.message : String(err)))
-    }
+  const handleDeleteHistoryItem = (index: number): void => {
+    if (!confirm('确定要删除这条部署记录吗？')) return
+    const newHistory = [...history]
+    newHistory.splice(index, 1)
+    setHistory(newHistory)
+    localStorage.setItem('deploy_history', JSON.stringify(newHistory))
   }
 
   const handleSaveConfig = (newConfig: { apiToken: string; accountId: string }): void => {
@@ -339,15 +352,25 @@ const DeployApp: React.FC = () => {
                     <p className="text-sm text-slate-400 font-medium max-w-md mx-auto mb-8">
                       {resourceError || '请先在下方完成 Cloudflare 基础设施配置，以获取您的资源列表。'}
                     </p>
-                    <button 
-                      onClick={() => window.api.openExternal('https://soft.ycz.me/help')}
-                      className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 flex items-center gap-3 mx-auto"
-                    >
-                      <ExternalLink size={16} />
-                      查看配置教程
-                    </button>
+                    <div className="flex items-center justify-center gap-4">
+                      <button 
+                        onClick={() => window.api.openExternal('https://soft.ycz.me/help')}
+                        className="px-8 py-4 bg-slate-100 text-slate-900 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95 flex items-center gap-3"
+                      >
+                        <ExternalLink size={16} />
+                        查看配置教程
+                      </button>
+                      <button 
+                        onClick={fetchResources}
+                        className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 flex items-center gap-3"
+                      >
+                        <RefreshCw size={16} />
+                        重新获取
+                      </button>
+                    </div>
                   </div>
                 )}
+
 
                 {loadingResources && (
                   <div className="py-20 text-center">
@@ -367,9 +390,17 @@ const DeployApp: React.FC = () => {
                             <h2 className="text-2xl font-black text-slate-900 tracking-tight">后端应用</h2>
                             <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">您的 Cloudflare Workers 服务列表</p>
                           </div>
-                          <div className="text-right">
-                            <span className="text-3xl font-black text-slate-900">{resources.workers.length}</span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase ml-2">个服务活跃</span>
+                          <div className="flex items-center gap-6">
+                            <button 
+                              onClick={fetchResources}
+                              className="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-200 hover:text-slate-600 transition-all"
+                            >
+                              <RefreshCw size={18} className={loadingResources ? 'animate-spin' : ''} />
+                            </button>
+                            <div className="text-right">
+                              <span className="text-3xl font-black text-slate-900">{resources.workers.length}</span>
+                              <span className="text-[10px] font-black text-slate-400 uppercase ml-2">个服务活跃</span>
+                            </div>
                           </div>
                         </div>
 
@@ -411,9 +442,17 @@ const DeployApp: React.FC = () => {
                             <h2 className="text-2xl font-black text-slate-900 tracking-tight">前端应用</h2>
                             <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">您的 Cloudflare Pages 项目列表</p>
                           </div>
-                          <div className="text-right">
-                            <span className="text-3xl font-black text-slate-900">{resources.pages.length}</span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase ml-2">个项目活跃</span>
+                          <div className="flex items-center gap-6">
+                            <button 
+                              onClick={fetchResources}
+                              className="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-200 hover:text-slate-600 transition-all"
+                            >
+                              <RefreshCw size={18} className={loadingResources ? 'animate-spin' : ''} />
+                            </button>
+                            <div className="text-right">
+                              <span className="text-3xl font-black text-slate-900">{resources.pages.length}</span>
+                              <span className="text-[10px] font-black text-slate-400 uppercase ml-2">个项目活跃</span>
+                            </div>
                           </div>
                         </div>
 
@@ -458,13 +497,21 @@ const DeployApp: React.FC = () => {
                                 {resources.d1.length} Total
                               </span>
                             </div>
-                            <button 
-                              onClick={handleCreateD1}
-                              className="px-5 py-2.5 bg-indigo-50 text-primary border border-indigo-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all active:scale-95 flex items-center gap-2"
-                            >
-                              <Plus size={14} />
-                              添加
-                            </button>
+                            <div className="flex items-center gap-3">
+                              <button 
+                                onClick={fetchResources}
+                                className="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-200 hover:text-slate-600 transition-all"
+                              >
+                                <RefreshCw size={18} className={loadingResources ? 'animate-spin' : ''} />
+                              </button>
+                              <button 
+                                onClick={handleCreateD1}
+                                className="px-5 py-2.5 bg-indigo-50 text-primary border border-indigo-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all active:scale-95 flex items-center gap-2"
+                              >
+                                <Plus size={14} />
+                                添加
+                              </button>
+                            </div>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {resources.d1.map((db: D1Database) => (
@@ -502,13 +549,21 @@ const DeployApp: React.FC = () => {
                                 {resources.r2.length} Total
                               </span>
                             </div>
-                            <button 
-                              onClick={handleCreateR2}
-                              className="px-5 py-2.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all active:scale-95 flex items-center gap-2"
-                            >
-                              <Plus size={14} />
-                              添加
-                            </button>
+                            <div className="flex items-center gap-3">
+                              <button 
+                                onClick={fetchResources}
+                                className="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-200 hover:text-slate-600 transition-all"
+                              >
+                                <RefreshCw size={18} className={loadingResources ? 'animate-spin' : ''} />
+                              </button>
+                              <button 
+                                onClick={handleCreateR2}
+                                className="px-5 py-2.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all active:scale-95 flex items-center gap-2"
+                              >
+                                <Plus size={14} />
+                                添加
+                              </button>
+                            </div>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {resources.r2.map((bucket: R2Bucket) => (
@@ -598,6 +653,12 @@ const DeployApp: React.FC = () => {
                                   >
                                     访问地址 <ExternalLink size={10} />
                                   </a>
+                                  <button
+                                    onClick={() => handleDeleteHistoryItem(index)}
+                                    className="p-2 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
                                 </div>
                               </div>
                             ))}
@@ -739,16 +800,75 @@ const DeployApp: React.FC = () => {
 
         {view === 'deploy-frontend' && (
           <div className="flex-1 overflow-hidden h-full">
-            <DeployProcess type="frontend" onBack={() => setView('initial')} />
+            <DeployProcess 
+              type="frontend" 
+              onBack={(tab) => {
+                if (tab) setActiveTab(tab as any)
+                setView('initial')
+              }} 
+            />
           </div>
         )}
 
         {view === 'deploy-backend' && (
           <div className="flex-1 overflow-hidden h-full">
-            <DeployProcess type="backend" onBack={() => setView('initial')} />
+            <DeployProcess 
+              type="backend" 
+              onBack={(tab) => {
+                if (tab) setActiveTab(tab as any)
+                setView('initial')
+              }} 
+            />
           </div>
         )}
       </main>
+
+      {/* Resource Creation Modal */}
+      {isResourceModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-300">
+            <h3 className="text-xl font-black text-slate-900 mb-2">
+              新建 {resourceModalType === 'd1' ? 'D1 数据库' : 'R2 存储桶'}
+            </h3>
+            <p className="text-sm text-slate-400 font-medium mb-6">
+              请为您的新资源输入一个唯一的名称。
+            </p>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                  资源名称
+                </label>
+                <input
+                  type="text"
+                  value={newResourceName}
+                  onChange={(e) => setNewResourceName(e.target.value)}
+                  placeholder={`例如: my-dream-${resourceModalType}`}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setIsResourceModalOpen(false)}
+                  className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleConfirmCreateResource}
+                  disabled={isCreating || !newResourceName}
+                  className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 flex items-center justify-center gap-2"
+                >
+                  {isCreating ? <RefreshCw size={14} className="animate-spin" /> : <Plus size={14} />}
+                  立即创建
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <DeployConfigModal
         isOpen={isConfigModalOpen}

@@ -22,7 +22,7 @@ interface ProjectInfo {
 }
 
 interface DeployProcessProps {
-  onBack: () => void
+  onBack: (tab?: string) => void
   type: 'frontend' | 'backend'
 }
 
@@ -688,7 +688,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                       />
                     </a>
                     <button
-                      onClick={onBack}
+                      onClick={() => onBack('backend')}
                       className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/30"
                     >
                       完成并返回
