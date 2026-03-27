@@ -523,14 +523,25 @@ const DeployApp: React.FC = () => {
                                   </div>
 
                                   {displayDomain && (
-                                    <div className="mb-6 px-1">
+                                    <div className="mb-6 px-1 flex items-center gap-2">
                                       <button 
                                         onClick={() => window.api.openExternal(`https://${displayDomain}`)}
-                                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-primary hover:bg-white hover:border-primary/30 transition-all group/link"
+                                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-primary hover:bg-white hover:border-primary/30 transition-all group/link flex-1 min-w-0"
                                       >
                                         <Globe size={12} className="text-slate-400 group-hover/link:text-primary transition-colors" />
-                                        <span className="text-[11px] font-black truncate max-w-[150px] tracking-tight">{displayDomain}</span>
+                                        <span className="text-[11px] font-black truncate tracking-tight">{displayDomain}</span>
                                         <ExternalLink size={10} className="text-slate-300 group-hover/link:text-primary transition-colors" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleCopy(displayDomain!, worker.id || worker.name)}
+                                        className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all shrink-0 ${
+                                          copySuccess === (worker.id || worker.name)
+                                            ? 'bg-emerald-50 border-emerald-100 text-emerald-500'
+                                            : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-primary/30 hover:text-primary'
+                                        }`}
+                                        title="复制域名"
+                                      >
+                                        {copySuccess === (worker.id || worker.name) ? <Check size={12} /> : <Copy size={12} />}
                                       </button>
                                     </div>
                                   )}
@@ -596,14 +607,25 @@ const DeployApp: React.FC = () => {
                                   </div>
 
                                   {displayDomain && (
-                                    <div className="mb-6 px-1">
+                                    <div className="mb-6 px-1 flex items-center gap-2">
                                       <button 
                                         onClick={() => window.api.openExternal(`https://${displayDomain}`)}
-                                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-emerald-600 hover:bg-white hover:border-emerald-300/50 transition-all group/link"
+                                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-emerald-600 hover:bg-white hover:border-emerald-300/50 transition-all group/link flex-1 min-w-0"
                                       >
                                         <Globe size={12} className="text-slate-400 group-hover/link:text-emerald-500 transition-colors" />
-                                        <span className="text-[11px] font-black truncate max-w-[150px] tracking-tight">{displayDomain}</span>
+                                        <span className="text-[11px] font-black truncate tracking-tight">{displayDomain}</span>
                                         <ExternalLink size={10} className="text-slate-300 group-hover/link:text-emerald-500 transition-colors" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleCopy(displayDomain!, page.id)}
+                                        className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all shrink-0 ${
+                                          copySuccess === page.id
+                                            ? 'bg-emerald-50 border-emerald-100 text-emerald-500'
+                                            : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-emerald-300/50 hover:text-emerald-500'
+                                        }`}
+                                        title="复制域名"
+                                      >
+                                        {copySuccess === page.id ? <Check size={12} /> : <Copy size={12} />}
                                       </button>
                                     </div>
                                   )}
