@@ -51,9 +51,6 @@ const DeployApp: React.FC = () => {
   const [selectedWorker, setSelectedWorker] = useState<{ id: string; name: string } | null>(null)
   const [isWorkerModalOpen, setIsWorkerModalOpen] = useState(false)
   
-  const [showUpdateMode, setShowUpdateMode] = useState(false)
-  const [updateTarget, setUpdateTarget] = useState<{ name: string; type: 'frontend' | 'backend' } | null>(null)
-  
   interface PagesProject {
     id: string
     name: string
@@ -464,25 +461,12 @@ const DeployApp: React.FC = () => {
                                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter bg-emerald-50 text-emerald-500`}>
                                     Active
                                   </span>
-                                  <div className="flex items-center gap-3">
-                                    {showUpdateMode && (
-                                      <button 
-                                        onClick={() => {
-                                          setUpdateTarget({ name: worker.id || worker.name, type: 'backend' })
-                                          setView('deploy-backend')
-                                        }}
-                                        className="text-[10px] font-black text-emerald-500 uppercase tracking-widest hover:underline"
-                                      >
-                                        更新应用
-                                      </button>
-                                    )}
-                                    <button 
-                                      onClick={() => handleOpenDomainModal('worker', worker.id || worker.name)}
-                                      className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
-                                    >
-                                      域名管理
-                                    </button>
-                                  </div>
+                                  <button 
+                                    onClick={() => handleOpenDomainModal('worker', worker.id || worker.name)}
+                                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                                  >
+                                    域名管理
+                                  </button>
                                 </div>
                               </div>
                             )
@@ -550,25 +534,12 @@ const DeployApp: React.FC = () => {
                                   <span className="px-3 py-1 bg-emerald-50 text-emerald-500 rounded-full text-[10px] font-black uppercase tracking-tighter">
                                     Active
                                   </span>
-                                  <div className="flex items-center gap-3">
-                                    {showUpdateMode && (
-                                      <button 
-                                        onClick={() => {
-                                          setUpdateTarget({ name: page.name, type: 'frontend' })
-                                          setView('deploy-frontend')
-                                        }}
-                                        className="text-[10px] font-black text-emerald-500 uppercase tracking-widest hover:underline"
-                                      >
-                                        更新应用
-                                      </button>
-                                    )}
-                                    <button 
-                                      onClick={() => handleOpenDomainModal('page', page.name)}
-                                      className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
-                                    >
-                                      域名管理
-                                    </button>
-                                  </div>
+                                  <button 
+                                    onClick={() => handleOpenDomainModal('page', page.name)}
+                                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                                  >
+                                    域名管理
+                                  </button>
                                 </div>
                               </div>
                             )
@@ -854,44 +825,6 @@ const DeployApp: React.FC = () => {
                               <p className="text-[10px] text-slate-400 font-medium mt-1">部署 D1 数据库架构与 Workers API</p>
                             </div>
                             <ChevronRight className="text-slate-200 group-hover:text-primary transition-colors" size={20} />
-                          </button>
-                        </div>
-
-                        <div className="flex flex-col md:flex-row items-center justify-center gap-6 mt-6">
-                          <button
-                            onClick={() => {
-                              setActiveTab('frontend')
-                              setShowUpdateMode(true)
-                            }}
-                            className="group bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100/50 hover:border-emerald-500/30 transition-all active:scale-[0.99] text-left flex items-center gap-4 w-full max-w-lg"
-                          >
-                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-500 shrink-0 shadow-sm">
-                              <RefreshCw size={20} />
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">
-                                前端应用更新
-                              </h4>
-                            </div>
-                            <ChevronRight className="text-slate-200 group-hover:text-emerald-500 transition-colors" size={16} />
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setActiveTab('backend')
-                              setShowUpdateMode(true)
-                            }}
-                            className="group bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 hover:border-primary/30 transition-all active:scale-[0.99] text-left flex items-center gap-4 w-full max-w-lg"
-                          >
-                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-primary shrink-0 shadow-sm">
-                              <RefreshCw size={20} />
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">
-                                后端应用更新
-                              </h4>
-                            </div>
-                            <ChevronRight className="text-slate-200 group-hover:text-primary transition-colors" size={16} />
                           </button>
                         </div>
                       </div>

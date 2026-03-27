@@ -24,10 +24,9 @@ interface ProjectInfo {
 interface DeployProcessProps {
   onBack: (tab?: string) => void
   type: 'frontend' | 'backend'
-  updateTarget?: string
 }
 
-const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, updateTarget }) => {
+const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type }) => {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null)
@@ -58,30 +57,8 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, updateTarge
         .listResources(configFields.CF_API_TOKEN, configFields.CF_ACCOUNT_ID)
         .then(setExistingResources)
         .catch(console.error)
-      
-      if (updateTarget && type === 'backend') {
-        window.api.cloudflare.getWorkerBindings(
-          configFields.CF_API_TOKEN,
-          configFields.CF_ACCOUNT_ID,
-          updateTarget
-        ).then(bindings => {
-          const d1 = bindings.find(b => b.type === 'd1' || b.type === 'd1_database')
-          const r2 = bindings.find(b => b.type === 'r2' || b.type === 'r2_bucket')
-          const vars = bindings.filter(b => b.type === 'plain_text' || b.type === 'secret_text')
-          
-          setConfigFields(prev => ({
-            ...prev,
-            name: updateTarget,
-            database_id: d1?.id || d1?.database_id || prev.database_id,
-            database_name: d1?.name || d1?.database_name || prev.database_name,
-            bucket_name: r2?.name || r2?.bucket_name || prev.bucket_name,
-            CF_ADMIN_CAPTCHA: vars.find(v => v.name === 'CF_ADMIN_CAPTCHA')?.text || prev.CF_ADMIN_CAPTCHA,
-            JWT_SECRET: vars.find(v => v.name === 'JWT_SECRET')?.text || prev.JWT_SECRET
-          }))
-        }).catch(console.error)
-      }
     }
-  }, [step, configFields.CF_API_TOKEN, configFields.CF_ACCOUNT_ID, updateTarget, type])
+  }, [step, configFields.CF_API_TOKEN, configFields.CF_ACCOUNT_ID])
 
   const isD1NameConflict = existingResources.d1.some((db) => db.name === configFields.database_name)
   const isR2NameConflict = existingResources.r2.some((b) => b.name === configFields.bucket_name)
@@ -112,26 +89,19 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, updateTarge
     try {
       setDeployStatus('running')
       setStep(3)
-      setDeployLogs([`🚀 启动${updateTarget ? '更新' : '部署'}流程...`])
+      setDeployLogs(['🚀 启动部署流程...'])
 
-      let d1Id = configFields.database_id
-
-      if (!updateTarget) {
-        // 1. Create/Verify Cloudflare Resources (Only for new deploy)
-        setDeployLogs((prev) => [...prev, '正在验证 Cloudflare 资源 (D1 & R2)...'])
-        const resources = await window.api.cloudflare.createResources(
-          configFields.CF_API_TOKEN,
-          configFields.CF_ACCOUNT_ID,
-          {
-            d1Name: configFields.database_name,
-            r2Name: configFields.bucket_name
-          }
-        )
-        d1Id = resources.d1Id
-        setDeployLogs((prev) => [...prev, `Cloudflare 资源就绪: D1 ID = ${d1Id}`])
-      } else {
-        setDeployLogs((prev) => [...prev, `正在更新应用: ${updateTarget} (复用现有资源)`])
-      }
+      // 1. Create/Verify Cloudflare Resources
+      setDeployLogs((prev) => [...prev, '正在验证 Cloudflare 资源 (D1 & R2)...'])
+      const resources = await window.api.cloudflare.createResources(
+        configFields.CF_API_TOKEN,
+        configFields.CF_ACCOUNT_ID,
+        {
+          d1Name: configFields.database_name,
+          r2Name: configFields.bucket_name
+        }
+      )
+      setDeployLogs((prev) => [...prev, `Cloudflare 资源就绪: D1 ID = ${resources.d1Id}`])
 
       // 2. Prepare wrangler.toml content
       setDeployLogs((prev) => [...prev, '正在生成 wrangler.toml 配置文件...'])
@@ -143,7 +113,7 @@ minify = true
 [[d1_databases]]
 binding = "DB"
 database_name = "${configFields.database_name}"
-database_id = "${d1Id}"
+database_id = "${resources.d1Id}"
 
 [[r2_buckets]]
 binding = "BUCKET"
@@ -164,7 +134,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
 
       // 清除旧的监听器，防止多开
       window.api.wrangler.removeAllListeners()
-
+      
       let capturedUrl = ''
 
       window.api.wrangler.onStdout((data) => {
@@ -190,7 +160,10 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
         window.api.wrangler.removeAllListeners()
 
         if (code === 0) {
-          const runMigration = (file: string = 'schema.sql'): Promise<void> => {
+          setDeployLogs((prev) => [...prev, '[SUCCESS] 代码部署成功！接下来开始初始化数据库环境...'])
+          setDeployLogs((prev) => [...prev, '正在准备 D1 数据库执行写入 (schema.sql)...'])
+          
+          const runMigration = (): Promise<void> => {
             return new Promise<void>((resolve, reject) => {
               window.api.wrangler.onStdout((data) => {
                 setDeployLogs((prev) => [...prev, `[DB] ${data}`])
@@ -203,35 +176,20 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                 if (mCode === 0) {
                   resolve()
                 } else {
-                  reject(new Error(`数据库迁移失败 (${file})，退出码: ${mCode}`))
+                  reject(new Error(`数据库迁移失败，退出码: ${mCode}`))
                 }
               })
               window.api.wrangler.run({
                 cwd: projectInfo.path,
-                args: ['d1', 'execute', 'DB', `--file=${file}`, '--remote', '-y']
+                args: ['d1', 'execute', 'DB', '--file=schema.sql', '--remote', '-y']
               })
             })
           }
 
           try {
-            if (!updateTarget) {
-              setDeployLogs((prev) => [...prev, '正在准备 D1 数据库执行写入 (schema.sql)...'])
-              await runMigration('schema.sql')
-            } else {
-              setDeployLogs((prev) => [...prev, '正在扫描数据库迁移脚本...'])
-              const migrations = await window.api.wrangler.listMigrations(projectInfo.path)
-              if (migrations.length > 0) {
-                setDeployLogs((prev) => [...prev, `发现 ${migrations.length} 个迁移脚本，按顺序执行...`])
-                for (const migration of migrations) {
-                  setDeployLogs((prev) => [...prev, `执行迁移: ${migration}...`])
-                  await runMigration(migration)
-                }
-              } else {
-                setDeployLogs((prev) => [...prev, '项目未发现新的迁移脚本。'])
-              }
-            }
+            await runMigration()
             setDeployStatus('success')
-            setDeployLogs((prev) => [...prev, `🎉 ${updateTarget ? '更新' : '部署'}完全成功！`])
+            setDeployLogs((prev) => [...prev, '🎉 部署完全成功！所有数据表已初始化。'])
 
             // Save Deployment History
             const history = JSON.parse(localStorage.getItem('deploy_history') || '[]')
@@ -240,7 +198,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
               name: configFields.name,
               type: type,
               url: finalUrl,
-              d1Id: d1Id,
+              d1Id: resources.d1Id,
               d1Name: configFields.database_name,
               r2Name: configFields.bucket_name,
               timestamp: Date.now()
@@ -248,9 +206,9 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
             localStorage.setItem('deploy_history', JSON.stringify([newEntry, ...history]))
           } catch (mErr: any) {
             setDeployLogs((prev) => [
-              ...prev,
-              `[DB FAILURE] 数据库迁移失败: ${mErr.message || String(mErr)}`,
-              '可能原因: 1. 数据库权限不足 2. 迁移文件语法错误。',
+              ...prev, 
+              `[DB FAILURE] 数据库写入失败: ${mErr.message || String(mErr)}`,
+              '可能原因: 1. 数据库权限不足 2. schema.sql 文件不存在。',
               `请访问帮助中心查看配置指南: ${HELP_URL}`
             ])
             setDeployStatus('failure')
@@ -258,7 +216,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
         } else {
           setDeployStatus('failure')
           setDeployLogs((prev) => [
-            ...prev,
+            ...prev, 
             `代码部署终止，退出码: ${code}`,
             '请检查控制台日志以获取更多详细错误信息。',
             `如有疑问请访问帮助中心: ${HELP_URL}`
@@ -318,7 +276,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
     try {
       setLoading(true)
       setError('')
-      const remoteUrl = 'https://io.ycz.me/updata/dist.zip'
+      const remoteUrl = 'https://soft.ycz.me/dreamadmin/dist.zip'
 
       const baseDir = await window.api.project.openDirectory()
       if (!baseDir) {
@@ -374,10 +332,10 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
           </button>
           <div>
             <h1 className="text-2xl font-black tracking-tight text-slate-900">
-              {updateTarget ? '应用更新' : `部署${type === 'frontend' ? '前端应用' : '管理后台'}`}
+              部署{type === 'frontend' ? '前端应用' : '管理后台'}
             </h1>
             <p className="mt-0.5 text-xs font-medium text-slate-400">
-              Cloudflare {type === 'frontend' ? 'Pages' : 'Workers'} {updateTarget ? 'Update' : 'Deployment'} Pipeline
+              Cloudflare {type === 'frontend' ? 'Pages' : 'Workers'} Deployment Pipeline
             </p>
           </div>
         </div>
@@ -409,13 +367,9 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
       {step === 1 && (
         <div className="space-y-6 animate-in fade-in duration-500">
           <div className="text-center">
-            <h2 className="text-xl font-bold text-slate-800">
-              {updateTarget ? `更新应用: ${updateTarget}` : '第一步：添加项目'}
-            </h2>
+            <h2 className="text-xl font-bold text-slate-800">第一步：添加项目</h2>
             <p className="mx-auto mt-2 max-w-lg text-sm text-slate-500">
-              {updateTarget 
-                ? '请选择源码更新方式。由于是更新已有应用，我们将尝试保留现状并执行增量逻辑。' 
-                : '您可以选择现有的本地项目文件夹，或者从我们的 Git 仓库中拉取最新的精简版工程代码。'}
+              您可以选择现有的本地项目文件夹，或者从我们的 Git 仓库中拉取最新的精简版工程代码。
             </p>
           </div>
 
@@ -495,12 +449,8 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
       {step === 2 && projectInfo && (
         <div className="space-y-8 animate-in fade-in slide-in-from-right-10 duration-500">
           <div className="text-center mb-10">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-              {updateTarget ? '同步环境配置' : '第二步：环境配置'}
-            </h2>
-            <p className="mt-2 text-sm text-slate-500 font-medium">
-              {updateTarget ? '我们已自动填充当前应用的云端配置，请核对后继续。' : '配置您的项目环境与资源绑定'}
-            </p>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">第二步：环境配置</h2>
+            <p className="mt-2 text-sm text-slate-500 font-medium">配置您的项目环境与资源绑定</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -656,7 +606,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
               onClick={handleStartDeploy}
               className="px-12 py-5 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl shadow-slate-900/40 hover:-translate-y-1 hover:bg-slate-800 active:scale-95 transition-all group flex items-center gap-3"
             >
-              <span>{updateTarget ? '立即更新' : '一键部署'}</span>
+              <span>一键部署</span>
               <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
