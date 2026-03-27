@@ -136,6 +136,20 @@ app.whenReady().then(() => {
     return fs.existsSync(filePath)
   })
 
+  ipcMain.handle('project:getMigrations', async (_event, projectPath: string) => {
+    const migrationsPath = path.join(projectPath, 'migrations')
+    if (!fs.existsSync(migrationsPath)) return []
+    
+    try {
+      const files = fs.readdirSync(migrationsPath)
+      // 过滤出 .sql 文件且不是 schema.sql
+      return files.filter(f => f.endsWith('.sql') && f.toLowerCase() !== 'schema.sql')
+    } catch (error) {
+      console.error('Failed to read migrations:', error)
+      return []
+    }
+  })
+
   ipcMain.on('project:run', (event: IpcMainEvent, options: { cwd: string; command: string; args: string[]; env?: Record<string, string> }) => {
     const { cwd, command, args, env } = options
 

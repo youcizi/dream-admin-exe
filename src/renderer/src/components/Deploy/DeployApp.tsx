@@ -54,6 +54,9 @@ const DeployApp: React.FC = () => {
   const [isWorkerModalOpen, setIsWorkerModalOpen] = useState(false)
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false)
 
+  const [isUpdate, setIsUpdate] = useState(false)
+  const [updateTarget, setUpdateTarget] = useState<WorkerService | null>(null)
+
 
   interface PagesProject {
     id: string
@@ -210,6 +213,18 @@ const DeployApp: React.FC = () => {
       setIsConfigModalOpen(true)
       return
     }
+    setIsUpdate(false)
+    setUpdateTarget(null)
+    setView('deploy-backend')
+  }
+
+  const handleStartUpdateBackend = (worker: WorkerService): void => {
+    if (!config) {
+      setIsConfigModalOpen(true)
+      return
+    }
+    setUpdateTarget(worker)
+    setIsUpdate(true)
     setView('deploy-backend')
   }
 
@@ -368,7 +383,7 @@ const DeployApp: React.FC = () => {
 
           if (matchingZone) {
             const records = await window.api.cloudflare.getDNSRecords(config.apiToken, matchingZone.id, domainName)
-            const cnameRecord = records.find((r: any) => r.type === 'CNAME' && r.name === domainName)
+            const cnameRecord = records.find((r: any) => r.type === 'CNAME' && r.name === domainName) as any
             if (cnameRecord) {
               await window.api.cloudflare.deleteDNSRecord(config.apiToken, matchingZone.id, cnameRecord.id)
             }
@@ -545,17 +560,23 @@ const DeployApp: React.FC = () => {
                                   )}
                                 </div>
 
-                                <div className="flex items-center justify-between pt-4 border-t border-slate-50 mt-auto">
-                                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter bg-emerald-50 text-emerald-500`}>
-                                    Active
-                                  </span>
-                                  <button
-                                    onClick={() => handleOpenDomainModal('worker', worker.id || worker.name)}
-                                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
-                                  >
-                                    域名管理
-                                  </button>
-                                </div>
+                                  <div className="flex items-center justify-between pt-4 border-t border-slate-50 mt-auto">
+                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter bg-emerald-50 text-emerald-500`}>
+                                      Active
+                                    </span>
+                                    <button
+                                      onClick={() => handleStartUpdateBackend(worker)}
+                                      className="text-[10px] font-black text-indigo-500 uppercase tracking-widest hover:underline"
+                                    >
+                                      更新部署
+                                    </button>
+                                    <button
+                                      onClick={() => handleOpenDomainModal('worker', worker.id || worker.name)}
+                                      className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                                    >
+                                      域名管理
+                                    </button>
+                                  </div>
                               </div>
                             )
                           })}
@@ -1016,9 +1037,13 @@ const DeployApp: React.FC = () => {
           <div className="flex-1 overflow-hidden h-full">
             <DeployProcess
               type="backend"
+              isUpdate={isUpdate}
+              updateTarget={updateTarget}
               onBack={(tab) => {
                 if (tab) setActiveTab(tab as any)
                 setView('initial')
+                setIsUpdate(false)
+                setUpdateTarget(null)
               }}
             />
           </div>

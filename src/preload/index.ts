@@ -35,6 +35,7 @@ const api = {
     saveFile: (content: string, defaultName: string) =>
       electronAPI.ipcRenderer.invoke('project:saveFile', content, defaultName),
     exists: (path: string) => electronAPI.ipcRenderer.invoke('project:exists', path),
+    getMigrations: (projectPath: string) => electronAPI.ipcRenderer.invoke('project:getMigrations', projectPath),
     run: (options: { cwd: string; command: string; args: string[]; env?: Record<string, string> }) => electronAPI.ipcRenderer.send('project:run', options),
     onStdout: (callback: (data: string) => void) => {
       electronAPI.ipcRenderer.on('project:stdout', (_event, data) => callback(data))
