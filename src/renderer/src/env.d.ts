@@ -3,13 +3,14 @@
 interface Window {
   api: {
     wrangler: {
-      run: (options: { cwd: string; args: string[] }) => void
+      run: (options: { cwd: string; args: string[]; env?: Record<string, string> }) => void
       stop: () => void
       sendInput: (input: string) => void
       onStdout: (callback: (data: string) => void) => void
       onStderr: (callback: (data: string) => void) => void
       onClose: (callback: (code: number | null) => void) => void
       onError: (callback: (err: string) => void) => void
+      removeAllListeners: () => void
       scanProjects: (rootPath: string) => Promise<any[]>
       readConfig: (projectPath: string) => Promise<string>
       saveConfig: (projectPath: string, content: string) => Promise<boolean>
@@ -20,6 +21,13 @@ interface Window {
     project: {
       openDirectory: () => Promise<string | null>
       downloadAndExtract: (url: string, baseDir: string) => Promise<string>
+      exists: (path: string) => Promise<boolean>
+      run: (options: { cwd: string; command: string; args: string[]; env?: Record<string, string> }) => void
+      onStdout: (callback: (data: string) => void) => void
+      onStderr: (callback: (data: string) => void) => void
+      onClose: (callback: (code: number) => void) => void
+      onError: (callback: (err: string) => void) => void
+      removeAllListeners: () => void
     },
     auth: {
       openLogin: (url: string) => Promise<string | null>

@@ -6,6 +6,7 @@ import * as fs from 'node:fs'
 interface WranglerOptions {
   cwd: string
   args: string[]
+  env?: Record<string, string>
 }
 
 interface ProjectInfo {
@@ -22,14 +23,23 @@ export function setupWranglerHandlers(): void {
       activeProcess.kill()
     }
 
-    const { cwd, args } = options
+    const { cwd, args, env } = options
     console.log(`Running: npx wrangler ${args.join(' ')} in ${cwd}`)
+
+    // Debug logging for credentials
+    if (env?.CLOUDFLARE_API_TOKEN) {
+      const t = env.CLOUDFLARE_API_TOKEN;
+      console.log(`[Wrangler] API Token: ${t.slice(0, 4)}...${t.slice(-4)} (Length: ${t.length})`);
+    }
+    if (env?.CLOUDFLARE_ACCOUNT_ID) {
+      console.log(`[Wrangler] Account ID: ${env.CLOUDFLARE_ACCOUNT_ID}`);
+    }
 
     // Use npx wrangler
     activeProcess = spawn('npx', ['wrangler', ...args], {
       cwd,
       shell: true,
-      env: { ...process.env, FORCE_COLOR: '1' }
+      env: { ...process.env, ...env, FORCE_COLOR: '1' }
     })
 
     activeProcess.stdout?.on('data', (data) => {

@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, IpcMainEvent } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -8,7 +8,7 @@ import { setupAuthHandlers } from './auth'
 import { setupDeployHandlers } from './deploy'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { exec } from 'node:child_process'
+import { exec, spawn } from 'node:child_process'
 import axios from 'axios'
 import { promisify } from 'node:util'
 
@@ -132,7 +132,36 @@ app.whenReady().then(() => {
     }
   })
 
+  ipcMain.handle('project:exists', async (_event, filePath: string) => {
+    return fs.existsSync(filePath)
+  })
+
+  ipcMain.on('project:run', (event: IpcMainEvent, options: { cwd: string; command: string; args: string[]; env?: Record<string, string> }) => {
+    const { cwd, command, args, env } = options
+
+    // Debug logging for credentials
+    if (env?.CLOUDFLARE_API_TOKEN) {
+      const t = env.CLOUDFLARE_API_TOKEN;
+      console.log(`[Project] API Token: ${t.slice(0, 4)}...${t.slice(-4)} (Length: ${t.length})`);
+    }
+    if (env?.CLOUDFLARE_ACCOUNT_ID) {
+      console.log(`[Project] Account ID: ${env.CLOUDFLARE_ACCOUNT_ID}`);
+    }
+
+    const child = spawn(command, args, {
+      cwd,
+      shell: true,
+      env: { ...process.env, ...env, FORCE_COLOR: '1' }
+    })
+
+    child.stdout?.on('data', (data) => event.reply('project:stdout', data.toString()))
+    child.stderr?.on('data', (data) => event.reply('project:stderr', data.toString()))
+    child.on('close', (code) => event.reply('project:close', code))
+    child.on('error', (err) => event.reply('project:error', err.message))
+  })
+
   createWindow()
+
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

@@ -12,7 +12,8 @@ import {
   Terminal,
   ExternalLink,
   ShieldCheck,
-  Zap
+  Zap,
+  X
 } from 'lucide-react'
 
 interface ProjectInfo {
@@ -71,31 +72,113 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type }) => {
     }
   }, [deployLogs])
 
+  const runProjectCommand = (command: string, args: string[]): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      window.api.project.removeAllListeners()
+      window.api.project.onStdout((data) => setDeployLogs((prev) => [...prev, data]))
+      window.api.project.onStderr((data) => setDeployLogs((prev) => [...prev, `[ERR] ${data}`]))
+      window.api.project.onClose((code) => {
+        window.api.project.removeAllListeners()
+        if (code === 0) resolve()
+        else reject(new Error(`命令执行失败: ${command} ${args.join(' ')}, 退出码: ${code}`))
+      })
+      window.api.project.onError((err) => reject(new Error(err)))
+      window.api.project.run({
+        cwd: projectInfo!.path,
+        command,
+        args,
+        env: {
+          CLOUDFLARE_API_TOKEN: configFields.CF_API_TOKEN.trim(),
+          CF_API_TOKEN: configFields.CF_API_TOKEN.trim(),
+          CLOUDFLARE_ACCOUNT_ID: configFields.CF_ACCOUNT_ID.trim(),
+          CF_ACCOUNT_ID: configFields.CF_ACCOUNT_ID.trim()
+        }
+      })
+    })
+  }
+
+  const runWranglerCommand = (args: string[]): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      window.api.wrangler.removeAllListeners()
+      window.api.wrangler.onStdout((data) => {
+        setDeployLogs((prev) => [...prev, data])
+        const urlMatch = data.match(/https:\/\/[a-zA-Z0-9.-]+\.(pages\.dev|workers\.dev)/)
+        if (urlMatch) {
+          setDeployedUrl(urlMatch[0])
+        }
+      })
+      window.api.wrangler.onStderr((data) => setDeployLogs((prev) => [...prev, `[ERR] ${data}`]))
+      window.api.wrangler.onClose((code) => {
+        window.api.wrangler.removeAllListeners()
+        if (code === 0) resolve()
+        else reject(new Error(`Wrangler 命令执行失败, 退出码: ${code}`))
+      })
+      window.api.wrangler.onError((err) => reject(new Error(err)))
+      window.api.wrangler.run({
+        cwd: projectInfo!.path,
+        args,
+        env: {
+          CLOUDFLARE_API_TOKEN: configFields.CF_API_TOKEN.trim(),
+          CF_API_TOKEN: configFields.CF_API_TOKEN.trim(),
+          CLOUDFLARE_ACCOUNT_ID: configFields.CF_ACCOUNT_ID.trim(),
+          CF_ACCOUNT_ID: configFields.CF_ACCOUNT_ID.trim()
+        }
+      })
+    })
+  }
+
   const handleStartDeploy = async (): Promise<void> => {
     if (!projectInfo) return
 
-    // Pre-check for conflicts and empty fields
     if (!configFields.database_name || !configFields.bucket_name) {
       setError('请完整填写数据库和存储桶名称')
       return
     }
 
-    if (isD1NameConflict) {
-      if (!confirm(`数据库名称 "${configFields.database_name}" 在您的账户中已存在。继续部署将尝试复用该数据库，是否继续？`)) {
-        return
-      }
+    if (!configFields.CF_API_TOKEN.trim() || !configFields.CF_ACCOUNT_ID.trim()) {
+      setError('请先在第一步中点击“立即配置”，填写完整的 Cloudflare Token 和 Account ID')
+      return
     }
+
+    const apiToken = configFields.CF_API_TOKEN.trim()
+    const accountId = configFields.CF_ACCOUNT_ID.trim()
 
     try {
       setDeployStatus('running')
       setStep(3)
       setDeployLogs(['🚀 启动部署流程...'])
 
-      // 1. Create/Verify Cloudflare Resources
+      // 1. Initial configuration update
+      setDeployLogs((prev) => [...prev, '正在初始化 wrangler.toml 配置文件...'])
+      const initialToml = `name = "${configFields.name}"
+main = "index.js"
+compatibility_date = "2024-03-25"
+minify = true
+account_id = "${accountId}"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "${configFields.database_name}"
+database_id = "${configFields.database_id || ''}"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "${configFields.bucket_name}"
+
+[vars]
+CF_ACCOUNT_ID = "${accountId}"
+CF_API_TOKEN = "${apiToken}"
+CF_ADMIN_CAPTCHA = "${configFields.CF_ADMIN_CAPTCHA}"
+JWT_SECRET = "${configFields.JWT_SECRET}"
+`
+      await window.api.wrangler.saveConfig(projectInfo.path, initialToml)
+      setDeployLogs((prev) => [...prev, 'wrangler.toml 已进行初步初始化'])
+
+      // 2. Create/Verify Cloudflare Resources
       setDeployLogs((prev) => [...prev, '正在验证 Cloudflare 资源 (D1 & R2)...'])
       const resources = await window.api.cloudflare.createResources(
-        configFields.CF_API_TOKEN,
-        configFields.CF_ACCOUNT_ID,
+        apiToken,
+        accountId,
         {
           d1Name: configFields.database_name,
           r2Name: configFields.bucket_name
@@ -103,135 +186,67 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type }) => {
       )
       setDeployLogs((prev) => [...prev, `Cloudflare 资源就绪: D1 ID = ${resources.d1Id}`])
 
-      // 2. Prepare wrangler.toml content
-      setDeployLogs((prev) => [...prev, '正在生成 wrangler.toml 配置文件...'])
-      const tomlContent = `name = "${configFields.name}"
-main = "index.js"
-compatibility_date = "2024-03-25"
-minify = true
+      // 3. Final configuration update with database_id
+      setDeployLogs((prev) => [...prev, '正在回填数据库 ID 并更新配置文件...'])
+      const finalToml = initialToml.replace(/database_id\s*=\s*".*"/, `database_id = "${resources.d1Id}"`)
+      await window.api.wrangler.saveConfig(projectInfo.path, finalToml)
+      setDeployLogs((prev) => [...prev, 'wrangler.toml 配置已完全重构'])
 
-[[d1_databases]]
-binding = "DB"
-database_name = "${configFields.database_name}"
-database_id = "${resources.d1Id}"
+      // 4. Run Build Command (using project run for npm)
+      setDeployLogs((prev) => [...prev, '正在执行项目构建命令 (npm run build)...'])
+      try {
+        await runProjectCommand('npm', ['run', 'build'])
+        setDeployLogs((prev) => [...prev, '[SUCCESS] 项目构建完成'])
+      } catch (bErr: any) {
+        setDeployLogs((prev) => [...prev, `[INFO] 构建命令跳过或失败 (可能已是打包好的项目): ${bErr.message || String(bErr)}`])
+      }
 
-[[r2_buckets]]
-binding = "BUCKET"
-bucket_name = "${configFields.bucket_name}"
+      // 5. Deploy Code
+      setDeployLogs((prev) => [...prev, '正在启动部署命令: wrangler deploy...'])
+      await runWranglerCommand(['deploy'])
+      setDeployLogs((prev) => [...prev, '[SUCCESS] 代码部署成功！'])
 
-[vars]
-CF_ACCOUNT_ID = "${configFields.CF_ACCOUNT_ID}"
-CF_API_TOKEN = "${configFields.CF_API_TOKEN}"
-CF_ADMIN_CAPTCHA = "${configFields.CF_ADMIN_CAPTCHA}"
-JWT_SECRET = "${configFields.JWT_SECRET}"
-`
-      // 3. Save wrangler.toml
-      await window.api.wrangler.saveConfig(projectInfo.path, tomlContent)
-      setDeployLogs((prev) => [...prev, 'wrangler.toml 配置文件已更新'])
+      // 6. DB Initialization (schema.sql)
+      const schemaPath = `${projectInfo.path}/schema.sql`
+      const hasSchema = await window.api.project.exists(schemaPath)
+      if (hasSchema) {
+        setDeployLogs((prev) => [...prev, '正在初始化数据库环境 (schema.sql)...'])
+        await runWranglerCommand(['d1', 'execute', 'DB', '--file=schema.sql', '--remote', '-y'])
+        setDeployLogs((prev) => [...prev, '[SUCCESS] 数据库初始化完成'])
+      } else {
+        setDeployLogs((prev) => [...prev, '[INFO] 未检测到 schema.sql，跳过初始化步骤'])
+      }
 
-      // 4. Run Wrangler Deploy
-      setDeployLogs((prev) => [...prev, '正在启动部署命令: npx wrangler deploy...'])
+      // 7. Check and Run Migrations
+      const migrationsPath = `${projectInfo.path}/migrations`
+      const hasMigrations = await window.api.project.exists(migrationsPath)
+      if (hasMigrations) {
+        setDeployLogs((prev) => [...prev, '检测到迁移文件，正在执行数据库迁移...'])
+        await runWranglerCommand(['d1', 'migrations', 'apply', 'DB', '--remote', '-y'])
+        setDeployLogs((prev) => [...prev, '[SUCCESS] 数据库迁移完成'])
+      }
 
-      // 清除旧的监听器，防止多开
-      window.api.wrangler.removeAllListeners()
-      
-      let capturedUrl = ''
+      setDeployStatus('success')
+      setDeployLogs((prev) => [...prev, '🎉 部署完全成功！所有步骤已完成。'])
 
-      window.api.wrangler.onStdout((data) => {
-        setDeployLogs((prev) => [...prev, data])
-        // 捕获部署后的 URL 地址
-        const urlMatch = data.match(/https:\/\/[a-zA-Z0-9.-]+\.(pages\.dev|workers\.dev)/)
-        if (urlMatch) {
-          capturedUrl = urlMatch[0]
-          setDeployedUrl(urlMatch[0])
-        }
-      })
+      // Save History
+      const history = JSON.parse(localStorage.getItem('deploy_history') || '[]')
+      const newEntry = {
+        name: configFields.name,
+        type: type,
+        url: deployedUrl,
+        d1Id: resources.d1Id,
+        d1Name: configFields.database_name,
+        r2Name: configFields.bucket_name,
+        timestamp: Date.now()
+      }
+      localStorage.setItem('deploy_history', JSON.stringify([newEntry, ...history]))
 
-      window.api.wrangler.onStderr((data) => {
-        setDeployLogs((prev) => [...prev, `[ERR] ${data}`])
-      })
-
-      window.api.wrangler.onError((err) => {
-        setDeployLogs((prev) => [...prev, `[ERROR] ${err}`])
-        setDeployStatus('failure')
-      })
-
-      window.api.wrangler.onClose(async (code) => {
-        window.api.wrangler.removeAllListeners()
-
-        if (code === 0) {
-          setDeployLogs((prev) => [...prev, '[SUCCESS] 代码部署成功！接下来开始初始化数据库环境...'])
-          setDeployLogs((prev) => [...prev, '正在准备 D1 数据库执行写入 (schema.sql)...'])
-          
-          const runMigration = (): Promise<void> => {
-            return new Promise<void>((resolve, reject) => {
-              window.api.wrangler.onStdout((data) => {
-                setDeployLogs((prev) => [...prev, `[DB] ${data}`])
-              })
-              window.api.wrangler.onStderr((data) => {
-                setDeployLogs((prev) => [...prev, `[DB ERR] ${data}`])
-              })
-              window.api.wrangler.onClose((mCode) => {
-                window.api.wrangler.removeAllListeners()
-                if (mCode === 0) {
-                  resolve()
-                } else {
-                  reject(new Error(`数据库迁移失败，退出码: ${mCode}`))
-                }
-              })
-              window.api.wrangler.run({
-                cwd: projectInfo.path,
-                args: ['d1', 'execute', 'DB', '--file=schema.sql', '--remote', '-y']
-              })
-            })
-          }
-
-          try {
-            await runMigration()
-            setDeployStatus('success')
-            setDeployLogs((prev) => [...prev, '🎉 部署完全成功！所有数据表已初始化。'])
-
-            // Save Deployment History
-            const history = JSON.parse(localStorage.getItem('deploy_history') || '[]')
-            const finalUrl = capturedUrl || deployedUrl
-            const newEntry = {
-              name: configFields.name,
-              type: type,
-              url: finalUrl,
-              d1Id: resources.d1Id,
-              d1Name: configFields.database_name,
-              r2Name: configFields.bucket_name,
-              timestamp: Date.now()
-            }
-            localStorage.setItem('deploy_history', JSON.stringify([newEntry, ...history]))
-          } catch (mErr: any) {
-            setDeployLogs((prev) => [
-              ...prev, 
-              `[DB FAILURE] 数据库写入失败: ${mErr.message || String(mErr)}`,
-              '可能原因: 1. 数据库权限不足 2. schema.sql 文件不存在。',
-              `请访问帮助中心查看配置指南: ${HELP_URL}`
-            ])
-            setDeployStatus('failure')
-          }
-        } else {
-          setDeployStatus('failure')
-          setDeployLogs((prev) => [
-            ...prev, 
-            `代码部署终止，退出码: ${code}`,
-            '请检查控制台日志以获取更多详细错误信息。',
-            `如有疑问请访问帮助中心: ${HELP_URL}`
-          ])
-        }
-      })
-
-      window.api.wrangler.run({
-        cwd: projectInfo.path,
-        args: ['deploy']
-      })
-    } catch (err: unknown) {
+    } catch (err: any) {
       setDeployLogs((prev) => [
         ...prev,
-        `[异常] ${err instanceof Error ? err.message : String(err)}`
+        `[异常] ${err.message || String(err)}`,
+        `请访问帮助中心查看配置指南: ${HELP_URL}`
       ])
       setDeployStatus('failure')
     }
@@ -675,7 +690,13 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
             {/* Success Overlay */}
             {deployStatus === 'success' && (
               <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-8 animate-in zoom-in duration-500">
-                <div className="bg-white p-10 rounded-[3rem] shadow-2xl text-center max-w-md w-full border border-slate-100 animate-in fade-in slide-in-from-bottom-10 duration-700 delay-300">
+                <div className="bg-white p-10 rounded-[3rem] shadow-2xl text-center max-w-md w-full border border-slate-100 animate-in fade-in slide-in-from-bottom-10 duration-700 delay-300 relative">
+                  <button
+                    onClick={() => setDeployStatus('idle')}
+                    className="absolute top-6 right-6 p-2 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-slate-600 transition-all"
+                  >
+                    <X size={20} />
+                  </button>
                   <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-500 mx-auto mb-6 shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform duration-500">
                     <Zap size={40} />
                   </div>
@@ -711,7 +732,13 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
             {/* Error Overlay */}
             {deployStatus === 'failure' && (
               <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-8 animate-in zoom-in duration-500">
-                <div className="bg-white p-10 rounded-[3rem] shadow-2xl text-center max-w-md w-full border border-red-100">
+                <div className="bg-white p-10 rounded-[3rem] shadow-2xl text-center max-w-md w-full border border-red-100 relative">
+                  <button
+                    onClick={() => setDeployStatus('idle')}
+                    className="absolute top-6 right-6 p-2 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-slate-600 transition-all"
+                  >
+                    <X size={20} />
+                  </button>
                   <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center text-red-500 mx-auto mb-6">
                     <AlertCircle size={40} />
                   </div>

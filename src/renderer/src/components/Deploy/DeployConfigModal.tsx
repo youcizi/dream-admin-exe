@@ -93,10 +93,19 @@ const DeployConfigModal: React.FC<DeployConfigModalProps> = ({ isOpen, onClose, 
 
             {/* Account ID */}
             <div className="space-y-3">
-              <label className="flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                <User size={14} className="text-emerald-500" />
-                Account ID
-              </label>
+              <div className="flex items-center justify-between pl-1">
+                <label className="flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                  <User size={14} className="text-emerald-500" />
+                  Account ID
+                </label>
+                <button
+                  onClick={() => window.api.openExternal('https://soft.ycz.me/help')}
+                  className="text-[10px] font-bold text-primary hover:text-indigo-600 transition-colors flex items-center gap-1"
+                >
+                  点击查看如何获取
+                  <ExternalLink size={10} />
+                </button>
+              </div>
               <input
                 type="text"
                 placeholder="在此输入您的 Account ID"

@@ -33,7 +33,27 @@ const api = {
     downloadAndExtract: (url: string, destDir: string) =>
       electronAPI.ipcRenderer.invoke('project:downloadAndExtract', url, destDir),
     saveFile: (content: string, defaultName: string) =>
-      electronAPI.ipcRenderer.invoke('project:saveFile', content, defaultName)
+      electronAPI.ipcRenderer.invoke('project:saveFile', content, defaultName),
+    exists: (path: string) => electronAPI.ipcRenderer.invoke('project:exists', path),
+    run: (options: { cwd: string; command: string; args: string[]; env?: Record<string, string> }) => electronAPI.ipcRenderer.send('project:run', options),
+    onStdout: (callback: (data: string) => void) => {
+      electronAPI.ipcRenderer.on('project:stdout', (_event, data) => callback(data))
+    },
+    onStderr: (callback: (data: string) => void) => {
+      electronAPI.ipcRenderer.on('project:stderr', (_event, data) => callback(data))
+    },
+    onClose: (callback: (code: number) => void) => {
+      electronAPI.ipcRenderer.on('project:close', (_event, code) => callback(code))
+    },
+    onError: (callback: (err: string) => void) => {
+      electronAPI.ipcRenderer.on('project:error', (_event, err) => callback(err))
+    },
+    removeAllListeners: () => {
+      electronAPI.ipcRenderer.removeAllListeners('project:stdout')
+      electronAPI.ipcRenderer.removeAllListeners('project:stderr')
+      electronAPI.ipcRenderer.removeAllListeners('project:close')
+      electronAPI.ipcRenderer.removeAllListeners('project:error')
+    }
   },
   shell: {
     openExternal: (url: string) => electronAPI.ipcRenderer.invoke('shell:openExternal', url),

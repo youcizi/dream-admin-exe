@@ -20,7 +20,7 @@ const CloudflareTokenModal: React.FC<CloudflareTokenModalProps> = ({ isOpen, onC
   const formattedAccountId = accountId || ':account'
 
   const r2Url = `https://dash.cloudflare.com/?to=/:account/r2/plans`
-  const tokenUrl = `https://dash.cloudflare.com/?to=/:account/api-tokens&permissionGroupKeys=[{"key":"zone","type":"read"},{"key":"account_dns_settings","type":"edit"},{"key":"zone_dns_settings","type":"edit"},{"key":"page","type":"edit"},{"key":"workers_scripts","type":"edit"},{"key":"workers_kv","type":"edit"},{"key":"workers_r2","type":"edit"},{"key":"workers_routes","type":"edit"},{"key":"d1","type":"edit"},{"key":"workers_r2_storage","type":"edit"},{"key":"workers_kv_storage","type":"edit"},{"key":"workers_ci","type":"edit"},{"key":"zone_access","type":"revoke"}]&name=dream-admin`
+  const tokenUrl = `https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=[{"key":"zone","type":"read"},{"key":"account_dns_settings","type":"edit"},{"key":"zone_dns_settings","type":"edit"},{"key":"page","type":"edit"},{"key":"workers_scripts","type":"edit"},{"key":"workers_kv","type":"edit"},{"key":"workers_r2","type":"edit"},{"key":"workers_routes","type":"edit"},{"key":"d1","type":"edit"},{"key":"workers_r2_storage","type":"edit"},{"key":"workers_kv_storage","type":"edit"},{"key":"workers_ci","type":"edit"},{"key":"zone_access","type":"revoke"}]&name=dream-admin`
 
   const handleOpenExternal = (url: string): void => {
     window.api.openExternal(url)
@@ -145,8 +145,9 @@ const CloudflareTokenModal: React.FC<CloudflareTokenModalProps> = ({ isOpen, onC
                     <div className="bg-white/80 p-4 rounded-xl border border-indigo-100 flex gap-3 items-start">
                       <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
                       <div className="text-[10px] font-bold text-slate-600 leading-normal">
-                        <span className="text-slate-900 font-black">重要设置：</span>
-                        在“区域资源”选项中，请务必选择 <span className="text-primary italic">“包括 - 账户的所有区域 - [您的账户名称]&apos;s Account”</span>。
+                        <span className="text-slate-900 font-black text-xs block mb-1">重要设置：</span>
+                        1. 在“区域资源”选项中，请务必选择 <span className="text-primary italic">“包括 - 账户的所有区域 - [您的账户名称]&apos;s Account”</span>。<br/>
+                        2. <span className="text-rose-500 font-extrabold uppercase tracking-tighter">关键：</span> 这里选择的账户 <span className="underline">必须</span> 与您在应用设置中填写的 <span className="font-black text-slate-900">Account ID</span> (当前: {accountId || '未填写'}) 属于同一个 Cloudflare 账户。
                       </div>
                     </div>
 
