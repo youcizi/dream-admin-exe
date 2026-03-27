@@ -201,6 +201,17 @@ export function setupDeployHandlers(): void {
     }
   )
 
+  ipcMain.handle(
+    'cloudflare:getPageDetails',
+    async (_event, apiToken, accountId, projectName) => {
+      const res = await axios.get(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects/${projectName}`,
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data.result
+    }
+  )
+
   // Workers Domain Management
   ipcMain.handle('cloudflare:getWorkerDomains', async (_event, apiToken, accountId) => {
     const res = await axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/domains`, {
@@ -341,6 +352,17 @@ export function setupDeployHandlers(): void {
         }
       )
       return res.data.result
+    }
+  )
+
+  ipcMain.handle(
+    'cloudflare:deleteDNSRecord',
+    async (_event, apiToken, zoneId, recordId) => {
+      const res = await axios.delete(
+        `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records/${recordId}`,
+        { headers: { Authorization: `Bearer ${apiToken}` } }
+      )
+      return res.data
     }
   )
 

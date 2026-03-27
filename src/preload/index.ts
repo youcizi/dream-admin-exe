@@ -58,6 +58,8 @@ const api = {
       electronAPI.ipcRenderer.invoke('cloudflare:addPageDomain', apiToken, accountId, projectName, domain),
     deletePage: (apiToken: string, accountId: string, projectName: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:deletePage', apiToken, accountId, projectName),
+    getPageDetails: (apiToken: string, accountId: string, projectName: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:getPageDetails', apiToken, accountId, projectName),
     getWorkerDomains: (apiToken: string, accountId: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:getWorkerDomains', apiToken, accountId),
     addWorkerDomain: (apiToken: string, accountId: string, service: string, hostname: string, zoneId: string) =>
@@ -86,6 +88,8 @@ const api = {
       electronAPI.ipcRenderer.invoke('cloudflare:createDNSRecord', apiToken, zoneId, type, name, content, proxied),
     getDNSRecords: (apiToken: string, zoneId: string, domainName: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:getDNSRecords', apiToken, zoneId, domainName),
+    deleteDNSRecord: (apiToken: string, zoneId: string, recordId: string) =>
+      electronAPI.ipcRenderer.invoke('cloudflare:deleteDNSRecord', apiToken, zoneId, recordId),
     queryD1: (apiToken: string, accountId: string, databaseId: string, sql: string) =>
       electronAPI.ipcRenderer.invoke('cloudflare:queryD1', apiToken, accountId, databaseId, sql),
     listR2Objects: (apiToken: string, accountId: string, bucketName: string, prefix?: string) =>

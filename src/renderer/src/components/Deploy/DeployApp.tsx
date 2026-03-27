@@ -9,6 +9,8 @@ import DeployProcess from './DeployProcess'
 import D1Viewer from './D1Viewer'
 import { R2Viewer } from './R2Viewer'
 import WorkerConfigModal from './WorkerConfigModal'
+import CloudflareTokenModal from './CloudflareTokenModal'
+
 
 interface DeploymentRecord {
   name: string
@@ -50,6 +52,8 @@ const DeployApp: React.FC = () => {
   
   const [selectedWorker, setSelectedWorker] = useState<{ id: string; name: string } | null>(null)
   const [isWorkerModalOpen, setIsWorkerModalOpen] = useState(false)
+  const [isTokenModalOpen, setIsTokenModalOpen] = useState(false)
+
   
   interface PagesProject {
     id: string
@@ -257,28 +261,84 @@ const DeployApp: React.FC = () => {
         .filter((z: any) => newDomain.endsWith(z.name))
         .sort((a: any, b: any) => b.name.length - a.name.length)[0]
 
-      if (!matchingZone) {
-        throw new Error('missing_zone')
-      }
-
-      const zoneId = matchingZone.id
+      const zoneId = matchingZone?.id
 
       // 2. Add domain to Pages/Workers
       if (domainModalTarget.type === 'page') {
-        await window.api.cloudflare.addPageDomain(config.apiToken, config.accountId, domainModalTarget.name, newDomain)
+        // Step 0: Get project details to find correct subdomain
+        let cnameTarget = `${domainModalTarget.name}.pages.dev`
+        try {
+          const projectDetails = await window.api.cloudflare.getPageDetails(
+            config.apiToken,
+            config.accountId,
+            domainModalTarget.name
+          )
+          if (projectDetails?.subdomain) {
+            cnameTarget = projectDetails.subdomain
+          }
+        } catch (detailErr) {
+          console.error('Failed to fetch project details:', detailErr)
+        }
+
+        // Step A: Bind domain
+        try {
+          await window.api.cloudflare.addPageDomain(
+            config.apiToken,
+            config.accountId,
+            domainModalTarget.name,
+            newDomain
+          )
+        } catch (bindErr: any) {
+          console.error('Binding failed:', bindErr)
+          alert('绑定失败')
+          return
+        }
+
+        // Step B: Set CNAME if zone exists
+        let cnameSuccess = false
+        if (zoneId) {
+          try {
+            await window.api.cloudflare.createDNSRecord(
+              config.apiToken,
+              zoneId,
+              'CNAME',
+              newDomain,
+              cnameTarget,
+              true
+            )
+            cnameSuccess = true
+          } catch (dnsErr) {
+            console.error('CNAME setting failed:', dnsErr)
+            cnameSuccess = false
+          }
+        }
+
+        if (cnameSuccess) {
+          setSuccessMsg('绑定完成并已自动配置 CNAME！')
+        } else if (zoneId) {
+          setSuccessMsg('绑定成功，但设置 cname 失败')
+        } else {
+          setSuccessMsg('绑定成功！由于未找到匹配的 DNS 站点，请手动配置 CNAME 指向 ' + cnameTarget)
+        }
       } else {
-        await window.api.cloudflare.addWorkerDomain(config.apiToken, config.accountId, domainModalTarget.name, newDomain, zoneId)
+        if (!matchingZone) {
+          throw new Error('missing_zone')
+        }
+        await window.api.cloudflare.addWorkerDomain(
+          config.apiToken,
+          config.accountId,
+          domainModalTarget.name,
+          newDomain,
+          zoneId
+        )
+        setSuccessMsg(
+          '域名已作为 Custom Domain 绑定到 Worker！Cloudflare 通常会自动尝试同步 DNS 记录。'
+        )
       }
 
       handleOpenDomainModal(domainModalTarget.type, domainModalTarget.name)
       setNewDomain('')
       fetchResources()
-      
-      const successTip = domainModalTarget.type === 'page'
-        ? '域名已添加到 Pages 项目！请务必手动在 Cloudflare 控制台为该域名设置 CNAME 解析记录。'
-        : '域名已作为 Custom Domain 绑定到 Worker！Cloudflare 通常会自动尝试同步 DNS 记录。'
-        
-      setSuccessMsg(`${successTip}`)
       setTimeout(() => setSuccessMsg(null), 10000)
     } catch (err: any) {
       if (err.message === 'missing_zone') {
@@ -299,6 +359,25 @@ const DeployApp: React.FC = () => {
     setLoadingDomains(true)
     try {
       if (domainModalTarget.type === 'page') {
+        // Step 1: Remove CNAME if possible
+        try {
+          const zones = await window.api.cloudflare.getZones(config.apiToken, config.accountId)
+          const matchingZone = zones
+            .filter((z: any) => domainName.endsWith(z.name))
+            .sort((a: any, b: any) => b.name.length - a.name.length)[0]
+          
+          if (matchingZone) {
+            const records = await window.api.cloudflare.getDNSRecords(config.apiToken, matchingZone.id, domainName)
+            const cnameRecord = records.find((r: any) => r.type === 'CNAME' && r.name === domainName)
+            if (cnameRecord) {
+              await window.api.cloudflare.deleteDNSRecord(config.apiToken, matchingZone.id, cnameRecord.id)
+            }
+          }
+        } catch (dnsErr) {
+          console.error('Failed to delete CNAME record:', dnsErr)
+          // Don't block domain deletion if DNS deletion fails
+        }
+
         await window.api.cloudflare.deletePageDomain(config.apiToken, config.accountId, domainModalTarget.name, domainName)
       } else if (domainId) {
         await window.api.cloudflare.deleteWorkerDomain(config.apiToken, config.accountId, domainId)
@@ -887,15 +966,16 @@ const DeployApp: React.FC = () => {
                     {config ? '修改配置' : '立即配置'}
                   </button>
                   <button
-                    onClick={() => window.api.openExternal('https://soft.ycz.me/help')}
+                    onClick={() => setIsTokenModalOpen(true)}
                     className="flex items-center gap-2 text-primary hover:text-indigo-700 text-xs font-black transition-colors group"
                   >
-                    查看配置教程
-                    <ExternalLink
+                    一键创建令牌
+                    <ChevronRight
                       size={14}
-                      className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+                      className="group-hover:translate-x-0.5 transition-transform"
                     />
                   </button>
+
                 </div>
               </div>
             </div>
@@ -1013,7 +1093,13 @@ const DeployApp: React.FC = () => {
         config={config}
         resources={resources}
       />
+      <CloudflareTokenModal 
+        isOpen={isTokenModalOpen} 
+        onClose={() => setIsTokenModalOpen(false)} 
+        accountId={config?.accountId}
+      />
     </div>
+
   )
 }
 
