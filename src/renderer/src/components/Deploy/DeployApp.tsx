@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { 
-  Plus, History, Cloud, Settings, ExternalLink, ShieldCheck, Zap, 
+import {
+  Plus, History, Cloud, Settings, ExternalLink, ShieldCheck, Zap,
   RefreshCw, XCircle, ChevronRight, Globe, Database, Trash2, AlertTriangle,
   Copy, Check, HelpCircle
 } from 'lucide-react'
@@ -43,18 +43,18 @@ const DeployApp: React.FC = () => {
   const [resourceModalType, setResourceModalType] = useState<'d1' | 'r2' | null>(null)
   const [newResourceName, setNewResourceName] = useState('')
   const [isCreating, setIsCreating] = useState(false)
-  
+
   const [selectedD1, setSelectedD1] = useState<D1Database | null>(null)
   const [isD1ViewerOpen, setIsD1ViewerOpen] = useState(false)
-  
+
   const [selectedR2, setSelectedR2] = useState<R2Bucket | null>(null)
   const [isR2ViewerOpen, setIsR2ViewerOpen] = useState(false)
-  
+
   const [selectedWorker, setSelectedWorker] = useState<{ id: string; name: string } | null>(null)
   const [isWorkerModalOpen, setIsWorkerModalOpen] = useState(false)
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false)
 
-  
+
   interface PagesProject {
     id: string
     name: string
@@ -355,7 +355,7 @@ const DeployApp: React.FC = () => {
   const handleDeleteDomain = async (domainName: string, domainId?: string): Promise<void> => {
     if (!config || !domainModalTarget) return
     if (!confirm(`确定要删除域名 ${domainName} 的绑定吗？`)) return
-    
+
     setLoadingDomains(true)
     try {
       if (domainModalTarget.type === 'page') {
@@ -365,7 +365,7 @@ const DeployApp: React.FC = () => {
           const matchingZone = zones
             .filter((z: any) => domainName.endsWith(z.name))
             .sort((a: any, b: any) => b.name.length - a.name.length)[0]
-          
+
           if (matchingZone) {
             const records = await window.api.cloudflare.getDNSRecords(config.apiToken, matchingZone.id, domainName)
             const cnameRecord = records.find((r: any) => r.type === 'CNAME' && r.name === domainName)
@@ -414,11 +414,10 @@ const DeployApp: React.FC = () => {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as any)}
-                    className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                      activeTab === tab.id
+                    className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab.id
                         ? 'bg-white text-slate-900 shadow-sm border border-slate-100'
                         : 'text-slate-400 hover:text-slate-600'
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -437,14 +436,14 @@ const DeployApp: React.FC = () => {
                       {resourceError || '请先在下方完成 Cloudflare 基础设施配置，以获取您的资源列表。'}
                     </p>
                     <div className="flex items-center justify-center gap-4">
-                      <button 
+                      <button
                         onClick={() => window.api.openExternal('https://soft.ycz.me/help')}
                         className="px-8 py-4 bg-slate-100 text-slate-900 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95 flex items-center gap-3"
                       >
                         <ExternalLink size={16} />
                         查看配置教程
                       </button>
-                      <button 
+                      <button
                         onClick={fetchResources}
                         className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 flex items-center gap-3"
                       >
@@ -475,7 +474,7 @@ const DeployApp: React.FC = () => {
                             <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">您的 Cloudflare Workers 应用列表</p>
                           </div>
                           <div className="flex items-center gap-6">
-                            <button 
+                            <button
                               onClick={fetchResources}
                               className="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-200 hover:text-slate-600 transition-all"
                             >
@@ -499,7 +498,7 @@ const DeployApp: React.FC = () => {
                               <div key={worker.id} className="group bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all flex flex-col justify-between h-full">
                                 <div>
                                   <div className="flex items-center gap-4 mb-6">
-                                    <div 
+                                    <div
                                       className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-primary shadow-inner cursor-pointer hover:bg-indigo-100 transition-colors"
                                       onClick={() => {
                                         setSelectedWorker({ id: worker.id, name: worker.name })
@@ -509,7 +508,7 @@ const DeployApp: React.FC = () => {
                                       <Settings size={22} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <h3 
+                                      <h3
                                         className="text-sm font-black text-slate-900 truncate cursor-pointer hover:text-primary transition-colors"
                                         onClick={() => {
                                           setSelectedWorker({ id: worker.id, name: worker.name })
@@ -524,7 +523,7 @@ const DeployApp: React.FC = () => {
 
                                   {displayDomain && (
                                     <div className="mb-6 px-1 flex items-center gap-2">
-                                      <button 
+                                      <button
                                         onClick={() => window.api.openExternal(`https://${displayDomain}`)}
                                         className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-primary hover:bg-white hover:border-primary/30 transition-all group/link flex-1 min-w-0"
                                       >
@@ -534,11 +533,10 @@ const DeployApp: React.FC = () => {
                                       </button>
                                       <button
                                         onClick={() => handleCopy(displayDomain!, worker.id || worker.name)}
-                                        className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all shrink-0 ${
-                                          copySuccess === (worker.id || worker.name)
+                                        className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all shrink-0 ${copySuccess === (worker.id || worker.name)
                                             ? 'bg-emerald-50 border-emerald-100 text-emerald-500'
                                             : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-primary/30 hover:text-primary'
-                                        }`}
+                                          }`}
                                         title="复制域名"
                                       >
                                         {copySuccess === (worker.id || worker.name) ? <Check size={12} /> : <Copy size={12} />}
@@ -551,7 +549,7 @@ const DeployApp: React.FC = () => {
                                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter bg-emerald-50 text-emerald-500`}>
                                     Active
                                   </span>
-                                  <button 
+                                  <button
                                     onClick={() => handleOpenDomainModal('worker', worker.id || worker.name)}
                                     className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
                                   >
@@ -574,7 +572,7 @@ const DeployApp: React.FC = () => {
                             <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">您的 Cloudflare Pages 应用列表</p>
                           </div>
                           <div className="flex items-center gap-6">
-                            <button 
+                            <button
                               onClick={fetchResources}
                               className="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-200 hover:text-slate-600 transition-all"
                             >
@@ -608,7 +606,7 @@ const DeployApp: React.FC = () => {
 
                                   {displayDomain && (
                                     <div className="mb-6 px-1 flex items-center gap-2">
-                                      <button 
+                                      <button
                                         onClick={() => window.api.openExternal(`https://${displayDomain}`)}
                                         className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-emerald-600 hover:bg-white hover:border-emerald-300/50 transition-all group/link flex-1 min-w-0"
                                       >
@@ -618,11 +616,10 @@ const DeployApp: React.FC = () => {
                                       </button>
                                       <button
                                         onClick={() => handleCopy(displayDomain!, page.id)}
-                                        className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all shrink-0 ${
-                                          copySuccess === page.id
+                                        className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all shrink-0 ${copySuccess === page.id
                                             ? 'bg-emerald-50 border-emerald-100 text-emerald-500'
                                             : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-emerald-300/50 hover:text-emerald-500'
-                                        }`}
+                                          }`}
                                         title="复制域名"
                                       >
                                         {copySuccess === page.id ? <Check size={12} /> : <Copy size={12} />}
@@ -635,7 +632,7 @@ const DeployApp: React.FC = () => {
                                   <span className="px-3 py-1 bg-emerald-50 text-emerald-500 rounded-full text-[10px] font-black uppercase tracking-tighter">
                                     Active
                                   </span>
-                                  <button 
+                                  <button
                                     onClick={() => handleOpenDomainModal('page', page.name)}
                                     className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
                                   >
@@ -662,13 +659,13 @@ const DeployApp: React.FC = () => {
                               </span>
                             </div>
                             <div className="flex items-center gap-3">
-                              <button 
+                              <button
                                 onClick={fetchResources}
                                 className="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-200 hover:text-slate-600 transition-all"
                               >
                                 <RefreshCw size={18} className={loadingResources ? 'animate-spin' : ''} />
                               </button>
-                              <button 
+                              <button
                                 onClick={handleCreateD1}
                                 className="px-5 py-2.5 bg-indigo-50 text-primary border border-indigo-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all active:scale-95 flex items-center gap-2"
                               >
@@ -680,7 +677,7 @@ const DeployApp: React.FC = () => {
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {resources.d1.map((db: D1Database) => (
                               <div key={db.uuid} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:border-primary/20">
-                                <div 
+                                <div
                                   className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 cursor-pointer hover:bg-indigo-50 hover:text-primary transition-all"
                                   onClick={() => {
                                     setSelectedD1(db)
@@ -690,7 +687,7 @@ const DeployApp: React.FC = () => {
                                   <Database size={22} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h3 
+                                  <h3
                                     className="text-[13px] font-black text-slate-800 truncate leading-tight mb-1 cursor-pointer hover:text-primary transition-colors"
                                     onClick={() => {
                                       setSelectedD1(db)
@@ -704,11 +701,10 @@ const DeployApp: React.FC = () => {
                                 <div className="flex flex-col gap-2">
                                   <button
                                     onClick={() => handleCopy(db.uuid, db.uuid)}
-                                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
-                                      copySuccess === db.uuid 
-                                        ? 'bg-emerald-50 text-emerald-500' 
+                                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${copySuccess === db.uuid
+                                        ? 'bg-emerald-50 text-emerald-500'
                                         : 'text-slate-300 hover:text-primary hover:bg-slate-50'
-                                    }`}
+                                      }`}
                                     title="复制数据库 ID"
                                   >
                                     {copySuccess === db.uuid ? <Check size={14} /> : <Copy size={14} />}
@@ -741,13 +737,13 @@ const DeployApp: React.FC = () => {
                               </span>
                             </div>
                             <div className="flex items-center gap-3">
-                              <button 
+                              <button
                                 onClick={fetchResources}
                                 className="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:bg-slate-200 hover:text-slate-600 transition-all"
                               >
                                 <RefreshCw size={18} className={loadingResources ? 'animate-spin' : ''} />
                               </button>
-                              <button 
+                              <button
                                 onClick={handleCreateR2}
                                 className="px-5 py-2.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all active:scale-95 flex items-center gap-2"
                               >
@@ -759,7 +755,7 @@ const DeployApp: React.FC = () => {
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {resources.r2.map((bucket: R2Bucket) => (
                               <div key={bucket.name} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:border-primary/20">
-                                <div 
+                                <div
                                   className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 cursor-pointer hover:bg-emerald-50 hover:text-emerald-500 transition-all"
                                   onClick={() => {
                                     setSelectedR2(bucket)
@@ -769,7 +765,7 @@ const DeployApp: React.FC = () => {
                                   <Cloud size={22} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h3 
+                                  <h3
                                     className="text-[13px] font-black text-slate-800 truncate leading-tight mb-1 cursor-pointer hover:text-emerald-500 transition-colors"
                                     onClick={() => {
                                       setSelectedR2(bucket)
@@ -885,7 +881,7 @@ const DeployApp: React.FC = () => {
 
                     {activeTab === 'deploy' && (
                       /* Deployment Main Action Area */
-                      <div className="mb-12 animate-in fade-in slide-in-from-bottom-4">
+                      <div className="pt-6 mb-12 animate-in fade-in slide-in-from-bottom-4">
                         <div className="mb-8 text-center">
                           <div className="w-16 h-16 bg-primary/10 rounded-[1.5rem] flex items-center justify-center text-primary mx-auto mb-6 shadow-xl shadow-primary/10">
                             <Cloud size={32} />
@@ -1006,24 +1002,24 @@ const DeployApp: React.FC = () => {
 
         {view === 'deploy-frontend' && (
           <div className="flex-1 overflow-hidden h-full">
-            <DeployProcess 
-              type="frontend" 
+            <DeployProcess
+              type="frontend"
               onBack={(tab) => {
                 if (tab) setActiveTab(tab as any)
                 setView('initial')
-              }} 
+              }}
             />
           </div>
         )}
 
         {view === 'deploy-backend' && (
           <div className="flex-1 overflow-hidden h-full">
-            <DeployProcess 
-              type="backend" 
+            <DeployProcess
+              type="backend"
               onBack={(tab) => {
                 if (tab) setActiveTab(tab as any)
                 setView('initial')
-              }} 
+              }}
             />
           </div>
         )}
@@ -1039,7 +1035,7 @@ const DeployApp: React.FC = () => {
             <p className="text-sm text-slate-400 font-medium mb-6">
               请为您的新资源输入一个唯一的名称。
             </p>
-            
+
             <div className="space-y-6">
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
@@ -1115,9 +1111,9 @@ const DeployApp: React.FC = () => {
         config={config}
         resources={resources}
       />
-      <CloudflareTokenModal 
-        isOpen={isTokenModalOpen} 
-        onClose={() => setIsTokenModalOpen(false)} 
+      <CloudflareTokenModal
+        isOpen={isTokenModalOpen}
+        onClose={() => setIsTokenModalOpen(false)}
         accountId={config?.accountId}
       />
     </div>
@@ -1139,8 +1135,8 @@ interface DomainBindingModalProps {
   successMsg?: string | null
 }
 
-const DomainBindingModal: React.FC<DomainBindingModalProps> = ({ 
-  isOpen, onClose, type, name, domains, loading, onAdd, onDelete, newDomain, setNewDomain, successMsg 
+const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
+  isOpen, onClose, type, name, domains, loading, onAdd, onDelete, newDomain, setNewDomain, successMsg
 }) => {
   const inputRef = React.useRef<HTMLInputElement>(null)
 
@@ -1185,7 +1181,7 @@ const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
               <div className="flex-1">
                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1.5">操作说明</p>
                 <p className="text-xs font-bold text-indigo-700 leading-relaxed mb-3">{successMsg}</p>
-                <button 
+                <button
                   onClick={() => window.api.openExternal(HELP_URL)}
                   className="px-4 py-2 bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-600 transition-all active:scale-95"
                 >
@@ -1209,7 +1205,7 @@ const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
                         <button onClick={() => window.api.openExternal(`https://${d.name}`)}>
                           <ExternalLink size={14} className="text-slate-300 hover:text-primary transition-colors cursor-pointer" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => onDelete(d.name, d.id)}
                           className="p-1 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded transition-all"
                         >
@@ -1255,7 +1251,7 @@ const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
                 <HelpCircle size={14} className="text-slate-400 mt-0.5" />
                 <p className="text-[10px] font-medium text-slate-500 leading-relaxed">
                   绑定域名后，您需要前往 Cloudflare 控制台手动配置 CNAME 或 DNS 解析记录。
-                  <button 
+                  <button
                     onClick={() => window.api.openExternal(HELP_URL)}
                     className="text-indigo-500 hover:text-indigo-600 ml-1 font-black underline"
                   >
@@ -1263,14 +1259,14 @@ const DomainBindingModal: React.FC<DomainBindingModalProps> = ({
                   </button>
                 </p>
               </div>
+            </div>
           </div>
         </div>
-      </div>
         <div className="p-6 bg-slate-50 border-t border-slate-100 text-center">
           <p className="text-[10px] font-medium text-slate-400">
             绑定域名后，请确保在 Cloudflare DNS 中配置了正确的 CNAME 记录。
           </p>
-    </div>
+        </div>
       </div>
     </div>
   )
