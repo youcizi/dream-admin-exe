@@ -194,6 +194,9 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
         .replace(/database_name = ".*"/, `database_name = "${configFields.database_name}"`)
         .replace(/database_id = ".*"/, `database_id = "${resources.d1Id}"`)
         .replace(/bucket_name = ".*"/, `bucket_name = "${resources.r2Name}"`)
+        // 移除可能存在的同名普通变量，防止与 Secrets API 冲突
+        .replace(/^CF_ADMIN_CAPTCHA\s*=\s*".*"/gm, '')
+        .replace(/^JWT_SECRET\s*=\s*".*"/gm, '')
 
       await window.api.wrangler.saveConfig(projectInfo.path, updatedConfig)
 
@@ -233,6 +236,14 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
       if (!isUpdate) {
         setDeployLogs((prev) => [...prev, '正在初始化应用环境变量 (Secrets)...'])
         setDeployProgress(80)
+        
+        // 增加短暂延迟，确保 Cloudflare 管理面已同步新脚本
+        setDeployLogs((prev) => [...prev, '[INFO] 等待 Cloudflare 网络同步 (2s)...'])
+        await new Promise(resolve => setTimeout(resolve, 2000))
+
+        const apiToken = configFields.CF_API_TOKEN.trim()
+        const accountId = configFields.CF_ACCOUNT_ID.trim()
+        const scriptName = configFields.name.trim()
         const secrets = {
           CF_ADMIN_CAPTCHA: configFields.CF_ADMIN_CAPTCHA,
           JWT_SECRET: configFields.JWT_SECRET
@@ -243,13 +254,35 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
             setDeployLogs((prev) => [...prev, `[INFO] 跳过未配置的变量: ${key}`])
             continue
           }
-          await window.api.cloudflare.updateWorkerVar(
-            configFields.CF_API_TOKEN.trim(),
-            configFields.CF_ACCOUNT_ID.trim(),
-            configFields.name,
-            key,
-            val
-          )
+
+          let success = false
+          let retries = 0
+          const maxRetries = 2
+
+          while (!success && retries <= maxRetries) {
+            try {
+              if (retries > 0) {
+                setDeployLogs((prev) => [...prev, `[INFO] 正在重试同步 Secret: ${key} (第 ${retries} 次)...`])
+                await new Promise((resolve) => setTimeout(resolve, 1000))
+              } else {
+                setDeployLogs((prev) => [...prev, `正在同步 Secret: ${key}...`])
+              }
+
+              await window.api.cloudflare.updateWorkerVar(
+                apiToken,
+                accountId,
+                scriptName,
+                key,
+                String(val)
+              )
+              success = true
+            } catch (err: any) {
+              retries++
+              if (retries > maxRetries) {
+                throw err
+              }
+            }
+          }
         }
         setDeployLogs((prev) => [...prev, '[SUCCESS] 环境变量初始化完成'])
       }

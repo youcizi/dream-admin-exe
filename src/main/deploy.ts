@@ -438,12 +438,33 @@ export function setupDeployHandlers(): void {
     async (_event, apiToken: string, accountId: string, scriptName: string, name: string, value: string) => {
       // Cloudflare PUT /accounts/:account_id/workers/scripts/:script_name/secrets
       // Payload for single secret: { name, text }
-      const res = await axios.put(
-        `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${scriptName}/secrets`,
-        { name, text: value },
-        { headers: { Authorization: `Bearer ${apiToken}` } }
-      )
-      return res.data
+      try {
+        const url = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/workers/scripts/${encodeURIComponent(scriptName)}/secrets`
+        const res = await axios.put(
+          url,
+          { name, text: String(value), type: 'secret_text' },
+          { 
+            headers: { 
+              Authorization: `Bearer ${apiToken}`,
+              'Content-Type': 'application/json',
+              'User-Agent': 'Dream-Admin/1.0.0'
+            },
+            timeout: 15000 // 15s timeout
+          }
+        )
+        return res.data
+      } catch (error: any) {
+        if (error.response?.data) {
+          const cloudflareError = error.response.data
+          const errorMessage = cloudflareError.errors?.[0]?.message || 'Cloudflare API Error'
+          throw new Error(`[Cloudflare API Error] ${errorMessage} (Status: ${error.response.status})`)
+        }
+        // Handle lower-level Node Network Errors
+        if (error.code === 'ECONNRESET' || error.message.includes('disconnected')) {
+          throw new Error(`[Network Error] 连接被重置或关闭 (TLS/Socket Error)。请检查代理设置或网络环境。详细: ${error.message}`)
+        }
+        throw new Error(`[Internal Error] ${error.message}`)
+      }
     }
   )
 }
