@@ -407,6 +407,30 @@ const DeployApp: React.FC = () => {
     }
   }
 
+  const handleDeleteWorker = async (worker: WorkerService): Promise<void> => {
+    if (!config) return
+    if (!confirm(`确定要彻底删除后端应用 ${worker.id || worker.name} 吗？此操作无法撤销。`)) return
+    try {
+      await window.api.cloudflare.deleteWorker(config.apiToken, config.accountId, worker.id || worker.name)
+      alert('删除成功')
+      fetchResources()
+    } catch (err: any) {
+      alert('删除失败: ' + (err.message || String(err)))
+    }
+  }
+
+  const handleDeletePage = async (page: PagesProject): Promise<void> => {
+    if (!config) return
+    if (!confirm(`确定要彻底删除前端应用 ${page.name} 吗？此操作无法撤销。`)) return
+    try {
+      await window.api.cloudflare.deletePage(config.apiToken, config.accountId, page.name)
+      alert('删除成功')
+      fetchResources()
+    } catch (err: any) {
+      alert('删除失败: ' + (err.message || String(err)))
+    }
+  }
+
   return (
     <div className="h-screen bg-slate-50 text-slate-800 overflow-hidden font-sans flex flex-col relative">
       {/* Background Decor */}
@@ -564,18 +588,27 @@ const DeployApp: React.FC = () => {
                                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter bg-emerald-50 text-emerald-500`}>
                                       Active
                                     </span>
-                                    <button
-                                      onClick={() => handleStartUpdateBackend(worker)}
-                                      className="text-[10px] font-black text-indigo-500 uppercase tracking-widest hover:underline"
-                                    >
-                                      更新部署
-                                    </button>
-                                    <button
-                                      onClick={() => handleOpenDomainModal('worker', worker.id || worker.name)}
-                                      className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
-                                    >
-                                      域名管理
-                                    </button>
+                                    <div className="flex items-center gap-4">
+                                      <button
+                                        onClick={() => handleStartUpdateBackend(worker)}
+                                        className="text-[10px] font-black text-indigo-500 uppercase tracking-widest hover:underline"
+                                      >
+                                        更新部署
+                                      </button>
+                                      <button
+                                        onClick={() => handleOpenDomainModal('worker', worker.id || worker.name)}
+                                        className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                                      >
+                                        域名管理
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteWorker(worker)}
+                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                                        title="彻底删除应用"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
                                   </div>
                               </div>
                             )
@@ -653,12 +686,21 @@ const DeployApp: React.FC = () => {
                                   <span className="px-3 py-1 bg-emerald-50 text-emerald-500 rounded-full text-[10px] font-black uppercase tracking-tighter">
                                     Active
                                   </span>
-                                  <button
-                                    onClick={() => handleOpenDomainModal('page', page.name)}
-                                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
-                                  >
-                                    域名管理
-                                  </button>
+                                  <div className="flex items-center gap-4">
+                                    <button
+                                      onClick={() => handleOpenDomainModal('page', page.name)}
+                                      className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                                    >
+                                      域名管理
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeletePage(page)}
+                                      className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                                      title="彻底删除项目"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             )

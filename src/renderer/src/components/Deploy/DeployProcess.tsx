@@ -239,6 +239,10 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
         }
 
         for (const [key, val] of Object.entries(secrets)) {
+          if (!val) {
+            setDeployLogs((prev) => [...prev, `[INFO] 跳过未配置的变量: ${key}`])
+            continue
+          }
           await window.api.cloudflare.updateWorkerVar(
             configFields.CF_API_TOKEN.trim(),
             configFields.CF_ACCOUNT_ID.trim(),
@@ -260,7 +264,8 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
           if (hasSchema) {
             setDeployLogs((prev) => [...prev, '正在初始化数据库架构 (schema.sql)...'])
             setDeployProgress(90)
-            await runWranglerCommand(['d1', 'execute', 'DB', '--file=schema.sql', '--remote', '-y'])
+            // 使用 --database 标志确保通过 ID 正确执行，DB 是 wrangler.toml 中的绑定名
+            await runWranglerCommand(['d1', 'execute', 'DB', '--remote', `--database=${resources.d1Id}`, '--file=schema.sql', '-y'])
             setDeployLogs((prev) => [...prev, '[SUCCESS] 数据库初始化完成'])
           }
         } else if (selectedMigrations.length > 0) {
@@ -301,7 +306,8 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
               try {
                 // 如果迁移文件在 migrations 目录下，路径需要包含 migrations/
                 const filePath = m // m 已经是 'migrations/file.sql' 或 'file.sql' 了
-                await runWranglerCommand(['d1', 'execute', dbId as any, `--file=${filePath}`, '--remote', '-y'])
+                // 统一使用 --database 标志显式指定目标数据库 ID
+                await runWranglerCommand(['d1', 'execute', 'DB', '--remote', `--database=${dbId}`, `--file=${filePath}`, '-y'])
                 setDeployLogs((prev) => [...prev, `   [OK] ${m} 执行完成`])
               } catch (mErr: any) {
                 dbOperationSuccess = false
