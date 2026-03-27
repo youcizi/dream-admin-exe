@@ -24,6 +24,7 @@ interface Window {
       exists: (path: string) => Promise<boolean>
       run: (options: { cwd: string; command: string; args: string[]; env?: Record<string, string> }) => void
       getMigrations: (projectPath: string) => Promise<string[]>
+      readFile: (path: string) => Promise<string>
       onStdout: (callback: (data: string) => void) => void
       onStderr: (callback: (data: string) => void) => void
       onClose: (callback: (code: number) => void) => void
@@ -57,6 +58,7 @@ interface Window {
       deleteDNSRecord: (apiToken: string, zoneId: string, recordId: string) => Promise<unknown>
       getDNSRecords: (apiToken: string, zoneId: string, domainName: string) => Promise<any[]>
       updateWorkerVar: (apiToken: string, accountId: string, scriptName: string, name: string, value: string) => Promise<unknown>
+      queryD1: (apiToken: string, accountId: string, databaseId: string, sql: string) => Promise<any>
     }
     openExternal: (url: string) => Promise<void>
     openDeploy: () => void

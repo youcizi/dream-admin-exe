@@ -137,16 +137,35 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('project:getMigrations', async (_event, projectPath: string) => {
-    const migrationsPath = path.join(projectPath, 'migrations')
-    if (!fs.existsSync(migrationsPath)) return []
-    
     try {
-      const files = fs.readdirSync(migrationsPath)
-      // 过滤出 .sql 文件且不是 schema.sql
-      return files.filter(f => f.endsWith('.sql') && f.toLowerCase() !== 'schema.sql')
+      const results: string[] = []
+      
+      // 1. Scan migrations folder
+      const migrationsPath = path.join(projectPath, 'migrations')
+      if (fs.existsSync(migrationsPath)) {
+        const files = fs.readdirSync(migrationsPath)
+        files.filter(f => f.endsWith('.sql') && f.toLowerCase() !== 'schema.sql')
+             .forEach(f => results.push(`migrations/${f}`))
+      }
+      
+      // 2. Scan root folder
+      const rootFiles = fs.readdirSync(projectPath)
+      rootFiles.filter(f => f.endsWith('.sql') && f.toLowerCase() !== 'schema.sql')
+               .forEach(f => results.push(f))
+               
+      return results
     } catch (error) {
-      console.error('Failed to read migrations:', error)
+      console.error('Failed to scan migrations:', error)
       return []
+    }
+  })
+
+  ipcMain.handle('project:readFile', async (_event, filePath: string) => {
+    try {
+      return fs.readFileSync(filePath, 'utf8')
+    } catch (error) {
+      console.error('Failed to read file:', error)
+      throw error
     }
   })
 

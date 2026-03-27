@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import {
   ExternalLink, CheckCircle2, AlertTriangle, Info,
-  ChevronRight, ArrowRight, Shield, X, Globe
+  ChevronRight, Shield, X, Globe
 } from 'lucide-react'
 
 interface CloudflareTokenModalProps {

@@ -64,7 +64,10 @@ interface DeployProcessProps {
 const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, updateTarget }) => {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [previewingMigration, setPreviewingMigration] = useState<string | null>(null)
+  const [selectedMigrations, setSelectedMigrations] = useState<string[]>([])
   const [fetchingConfig, setFetchingConfig] = useState(false)
+  const [previewContent, setPreviewContent] = useState<string>('')
   const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null)
   const [error, setError] = useState('')
   const [configFields, setConfigFields] = useState({
@@ -78,16 +81,20 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
     CF_API_TOKEN: ''
   })
   const [deployLogs, setDeployLogs] = useState<string[]>([])
-  const [deployStatus, setDeployStatus] = useState<'idle' | 'running' | 'success' | 'failure'>('idle')
+  const [deployProgress, setDeployProgress] = useState(0)
+  const [deployStatus, setDeployStatus] = useState<'idle' | 'running' | 'success' | 'failure'>(
+    'idle'
+  )
   const [deployedUrl, setDeployedUrl] = useState('')
   const [existingResources, setExistingResources] = useState<{ d1: D1Database[]; r2: R2Bucket[] }>({
     d1: [],
     r2: []
   })
   const [detectedMigrations, setDetectedMigrations] = useState<string[]>([])
+  const [updateSubSites, setUpdateSubSites] = useState(false)
 
-  const HELP_URL = 'https://soft.ycz.me/help'
-
+  // 帮助文档地址
+  const HELP_URL = 'https://docs.soft.ycz.me/dream-admin/deploy'
   React.useEffect(() => {
     if (step === 2 && configFields.CF_API_TOKEN && configFields.CF_ACCOUNT_ID) {
       window.api.cloudflare
@@ -96,6 +103,14 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
         .catch(console.error)
     }
   }, [step, configFields.CF_API_TOKEN, configFields.CF_ACCOUNT_ID])
+
+  React.useEffect(() => {
+    if (isUpdate && detectedMigrations.length > 0) {
+      setSelectedMigrations(detectedMigrations)
+    } else {
+      setSelectedMigrations([])
+    }
+  }, [isUpdate, detectedMigrations, setSelectedMigrations])
 
   const isD1NameConflict = existingResources.d1.some((db) => db.name === configFields.database_name)
   const isR2NameConflict = existingResources.r2.some((b) => b.name === configFields.bucket_name)
@@ -108,30 +123,6 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
     }
   }, [deployLogs])
 
-  const runProjectCommand = (command: string, args: string[]): Promise<void> => {
-    return new Promise<void>((resolve, reject) => {
-      window.api.project.removeAllListeners()
-      window.api.project.onStdout((data) => setDeployLogs((prev) => [...prev, data]))
-      window.api.project.onStderr((data) => setDeployLogs((prev) => [...prev, `[ERR] ${data}`]))
-      window.api.project.onClose((code) => {
-        window.api.project.removeAllListeners()
-        if (code === 0) resolve()
-        else reject(new Error(`命令执行失败: ${command} ${args.join(' ')}, 退出码: ${code}`))
-      })
-      window.api.project.onError((err) => reject(new Error(err)))
-      window.api.project.run({
-        cwd: projectInfo!.path,
-        command,
-        args,
-        env: {
-          CLOUDFLARE_API_TOKEN: configFields.CF_API_TOKEN.trim(),
-          CF_API_TOKEN: configFields.CF_API_TOKEN.trim(),
-          CLOUDFLARE_ACCOUNT_ID: configFields.CF_ACCOUNT_ID.trim(),
-          CF_ACCOUNT_ID: configFields.CF_ACCOUNT_ID.trim()
-        }
-      })
-    })
-  }
 
   const runWranglerCommand = (args: string[]): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
@@ -163,156 +154,195 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
     })
   }
 
+  // 开始部署流程
   const handleStartDeploy = async (): Promise<void> => {
-    if (!projectInfo) return
-
-    if (!configFields.database_name || !configFields.bucket_name) {
-      setError('请完整填写数据库和存储桶名称')
+    if (!projectInfo || !configFields.CF_API_TOKEN || !configFields.CF_ACCOUNT_ID) {
+      setError('Cloudflare 凭证不完整，请返回第一步检查。')
       return
     }
 
-    if (!configFields.CF_API_TOKEN.trim() || !configFields.CF_ACCOUNT_ID.trim()) {
-      setError('请先在第一步中点击“立即配置”，填写完整的 Cloudflare Token 和 Account ID')
-      return
-    }
+    setDeployStatus('running')
+    setStep(3)
+    setDeployLogs(['[START] 开始部署流程...', `[INFO] 项目模式: ${isUpdate ? '更新部署' : '新应用部署'}`])
+    setDeployProgress(5)
 
     try {
-      setDeployStatus('running')
-      setStep(3)
-      setDeployLogs(['🚀 启动部署流程...'])
+      let resources = { d1Id: configFields.database_id, r2Name: configFields.bucket_name }
 
       if (!isUpdate) {
-        // 1. Initial configuration update
-        setDeployLogs((prev) => [...prev, '正在初始化 wrangler.toml 配置文件...'])
-        const initialToml = `name = "${configFields.name}"
-main = "index.js"
-compatibility_date = "2024-03-25"
-minify = true
-account_id = "${configFields.CF_ACCOUNT_ID.trim()}"
+        // 1. 创建 D1 和 R2 资源
+        setDeployLogs((prev) => [...prev, '正在初始化 Cloudflare 资源 (D1, R2)...'])
+        setDeployProgress(15)
+        const d1Name = configFields.database_name || 'dream-db'
+        const r2Name = configFields.bucket_name || 'dream-assets'
 
-[[d1_databases]]
-binding = "DB"
-database_name = "${configFields.database_name}"
-database_id = "${configFields.database_id || ''}"
-
-[[r2_buckets]]
-binding = "BUCKET"
-bucket_name = "${configFields.bucket_name}"
-
-[vars]
-CF_ACCOUNT_ID = "${configFields.CF_ACCOUNT_ID.trim()}"
-CF_API_TOKEN = "${configFields.CF_API_TOKEN.trim()}"
-CF_ADMIN_CAPTCHA = "${configFields.CF_ADMIN_CAPTCHA}"
-JWT_SECRET = "${configFields.JWT_SECRET}"
-`
-        await window.api.wrangler.saveConfig(projectInfo.path, initialToml)
-        setDeployLogs((prev) => [...prev, 'wrangler.toml 已进行初步初始化'])
-
-        // 2. Create/Verify Cloudflare Resources
-        setDeployLogs((prev) => [...prev, '⚙️ 正在创建 Cloudflare 资源...'])
-        const resources = await window.api.cloudflare.createResources(
+        const newResources = await window.api.cloudflare.createResources(
           configFields.CF_API_TOKEN.trim(),
           configFields.CF_ACCOUNT_ID.trim(),
-          {
-            d1Name: configFields.database_name,
-            r2Name: configFields.bucket_name
-          }
+          { d1Name, r2Name }
         )
-        setDeployLogs((prev) => [...prev, `Cloudflare 资源就绪: D1 ID = ${resources.d1Id}`])
-
-        // 3. Final configuration update with database_id
-        setDeployLogs((prev) => [...prev, '正在回填数据库 ID 并更新配置文件...'])
-        const finalToml = initialToml.replace(/database_id\s*=\s*".*"/, `database_id = "${resources.d1Id}"`)
-        await window.api.wrangler.saveConfig(projectInfo.path, finalToml)
-        setDeployLogs((prev) => [...prev, 'wrangler.toml 配置已完全重构'])
-      } else {
-        // Update mode: Overwrite wrangler.toml with current project info
-        setDeployLogs((prev) => [...prev, '正在更新部署配置 (基于现有资源)...'])
-        const updateToml = `name = "${configFields.name}"
-main = "index.js"
-compatibility_date = "2024-03-25"
-minify = true
-account_id = "${configFields.CF_ACCOUNT_ID.trim()}"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "${configFields.database_name}"
-database_id = "${configFields.database_id}"
-
-[[r2_buckets]]
-binding = "BUCKET"
-bucket_name = "${configFields.bucket_name}"
-
-[vars]
-CF_ACCOUNT_ID = "${configFields.CF_ACCOUNT_ID.trim()}"
-CF_API_TOKEN = "${configFields.CF_API_TOKEN.trim()}"
-CF_ADMIN_CAPTCHA = "${configFields.CF_ADMIN_CAPTCHA}"
-JWT_SECRET = "${configFields.JWT_SECRET}"
-`
-        await window.api.wrangler.saveConfig(projectInfo.path, updateToml)
-        setDeployLogs((prev) => [...prev, 'wrangler.toml 配置已针对更新模式完成重写'])
+        resources = newResources
+        setConfigFields((prev) => ({ ...prev, database_id: resources.d1Id, database_name: d1Name, bucket_name: r2Name }))
       }
 
-      // 4. Run Build Command (using project run for npm)
-      setDeployLogs((prev) => [...prev, '正在执行项目构建命令 (npm run build)...'])
-      try {
-        await runProjectCommand('npm', ['run', 'build'])
-        setDeployLogs((prev) => [...prev, '[SUCCESS] 项目构建完成'])
-      } catch (bErr: any) {
-        setDeployLogs((prev) => [...prev, `[INFO] 构建命令跳过或失败 (可能已是打包好的项目): ${bErr.message || String(bErr)}`])
-      }
+      // 2. 更新 wrangler.toml
+      setDeployLogs((prev) => [...prev, '正在同步配置文件 (wrangler.toml)...'])
+      setDeployProgress(30)
+      const configStr = projectInfo.config
+      const updatedConfig = configStr
+        .replace(/name = ".*"/, `name = "${configFields.name}"`)
+        .replace(/database_name = ".*"/, `database_name = "${configFields.database_name}"`)
+        .replace(/database_id = ".*"/, `database_id = "${resources.d1Id}"`)
+        .replace(/bucket_name = ".*"/, `bucket_name = "${resources.r2Name}"`)
 
-      // 5. Deploy Code
-      setDeployLogs((prev) => [...prev, '正在启动部署命令: wrangler deploy...'])
-      await runWranglerCommand(['deploy'])
-      setDeployLogs((prev) => [...prev, '[SUCCESS] 代码部署成功！'])
+      await window.api.wrangler.saveConfig(projectInfo.path, updatedConfig)
 
-      if (!isUpdate) {
-        // 6. DB Initialization (schema.sql)
-        const schemaPath = `${projectInfo.path}/schema.sql`
-        const hasSchema = await window.api.project.exists(schemaPath)
-        if (hasSchema) {
-          setDeployLogs((prev) => [...prev, '正在初始化数据库环境 (schema.sql)...'])
-          await runWranglerCommand(['d1', 'execute', 'DB', '--file=schema.sql', '--remote', '-y'])
-          setDeployLogs((prev) => [...prev, '[SUCCESS] 数据库初始化完成'])
-        } else {
-          setDeployLogs((prev) => [...prev, '[INFO] 未检测到 schema.sql，跳过初始化步骤'])
+      // 3. 构建项目 (通常后端 backend 需要 npm run build)
+      const buildCommand = projectInfo.path.toLowerCase().includes('backend') ? 'npm run build' : ''
+      if (buildCommand) {
+        setDeployLogs((prev) => [...prev, '正在执行项目构建命令...'])
+        setDeployProgress(45)
+        try {
+          await new Promise<void>((resolve, reject) => {
+            window.api.project.run({
+              cwd: projectInfo.path,
+              command: buildCommand,
+              args: [],
+              env: {
+                CLOUDFLARE_API_TOKEN: configFields.CF_API_TOKEN.trim(),
+                CLOUDFLARE_ACCOUNT_ID: configFields.CF_ACCOUNT_ID.trim()
+              }
+            })
+            window.api.project.onClose((code) => (code === 0 ? resolve() : reject(new Error(`Exit code ${code}`))))
+            window.api.project.onError((err) => reject(new Error(err)))
+          })
+          setDeployLogs((prev) => [...prev, '[SUCCESS] 项目构建完成'])
+        } catch (bErr: any) {
+          setDeployLogs((prev) => [...prev, `[INFO] 构建步骤提示: ${bErr.message || String(bErr)} (如果仓库已包含 dist 目录，此步骤通常可跳过)`])
         }
       }
 
-      // 7. Check and Run Migrations
-      const migrations = await window.api.project.getMigrations(projectInfo.path)
-      if (migrations && migrations.length > 0) {
-        setDeployLogs((prev) => [...prev, '检测到迁移文件，正在执行数据库迁移...'])
-        await runWranglerCommand(['d1', 'migrations', 'apply', 'DB', '--remote', '-y'])
-        setDeployLogs((prev) => [...prev, '[SUCCESS] 数据库迁移完成'])
+      // 4. 执行部署 (wrangler deploy)
+      setDeployLogs((prev) => [...prev, '正在上传代码至 Cloudflare 全球网络...'])
+      setDeployProgress(60)
+
+      await runWranglerCommand(['deploy'])
+      setDeployLogs((prev) => [...prev, '[SUCCESS] 代码部署已完成'])
+
+      // 5. 设置环境变量 (仅在新部署模式下需初始化环境变量)
+      if (!isUpdate) {
+        setDeployLogs((prev) => [...prev, '正在初始化应用环境变量 (Secrets)...'])
+        setDeployProgress(80)
+        const secrets = {
+          CF_ADMIN_CAPTCHA: configFields.CF_ADMIN_CAPTCHA,
+          JWT_SECRET: configFields.JWT_SECRET
+        }
+
+        for (const [key, val] of Object.entries(secrets)) {
+          await window.api.cloudflare.updateWorkerVar(
+            configFields.CF_API_TOKEN.trim(),
+            configFields.CF_ACCOUNT_ID.trim(),
+            configFields.name,
+            key,
+            val
+          )
+        }
+        setDeployLogs((prev) => [...prev, '[SUCCESS] 环境变量初始化完成'])
       }
 
-      setDeployStatus('success')
-      setDeployLogs((prev) => [...prev, '🎉 部署完全成功！所有步骤已完成。'])
+      // 6. 数据库迁移逻辑
+      let dbOperationSuccess = true
+      try {
+        if (!isUpdate) {
+          // 初始化新部署的数据库架构
+          const schemaPath = `${projectInfo.path}/schema.sql`
+          const hasSchema = await window.api.project.exists(schemaPath)
+          if (hasSchema) {
+            setDeployLogs((prev) => [...prev, '正在初始化数据库架构 (schema.sql)...'])
+            setDeployProgress(90)
+            await runWranglerCommand(['d1', 'execute', 'DB', '--file=schema.sql', '--remote', '-y'])
+            setDeployLogs((prev) => [...prev, '[SUCCESS] 数据库初始化完成'])
+          }
+        } else if (selectedMigrations.length > 0) {
+          // 更新部署模式：先获取所有需要迁移的数据库 ID 列表
+          setDeployLogs((prev) => [...prev, '正在初始化数据库同步任务...'])
+          const targetDatabases = [configFields.database_id] // 初始包含主库
 
-      // Save History
+          if (updateSubSites) {
+            try {
+              const res = await window.api.cloudflare.queryD1(
+                configFields.CF_API_TOKEN.trim(),
+                configFields.CF_ACCOUNT_ID.trim(),
+                configFields.database_id,
+                'SELECT database_id FROM sites'
+              )
+              const sitesList = res.result?.[0]?.results || []
+              const subSiteIds = sitesList
+                .map((s: any) => s.database_id)
+                .filter((id: string) => !!id && id !== configFields.database_id)
+
+              if (subSiteIds.length > 0) {
+                targetDatabases.push(...subSiteIds)
+                setDeployLogs((prev) => [...prev, `[INFO] 共发现 ${subSiteIds.length} 个子站数据库，将与主库一并迁移`])
+              }
+            } catch (syncErr: any) {
+              setDeployLogs((prev) => [...prev, `[WARNING] 获取子站列表失败 (跳过子站同步): ${syncErr.message || String(syncErr)}`])
+            }
+          }
+
+          // 统一执行迁移循环
+          setDeployLogs((prev) => [...prev, `开始对 ${targetDatabases.length} 个数据库执行 ${selectedMigrations.length} 个迁移文件...`])
+          for (const dbId of targetDatabases) {
+            const isMain = dbId === configFields.database_id
+            setDeployProgress((prev) => Math.min(prev + 20 / targetDatabases.length, 98))
+            setDeployLogs((prev) => [...prev, `>> 正在执行库: ${dbId}${isMain ? ' (主库)' : ' (子库)'}`])
+
+            for (const m of selectedMigrations) {
+              try {
+                // 如果迁移文件在 migrations 目录下，路径需要包含 migrations/
+                const filePath = m // m 已经是 'migrations/file.sql' 或 'file.sql' 了
+                await runWranglerCommand(['d1', 'execute', dbId as any, `--file=${filePath}`, '--remote', '-y'])
+                setDeployLogs((prev) => [...prev, `   [OK] ${m} 执行完成`])
+              } catch (mErr: any) {
+                dbOperationSuccess = false
+                setDeployLogs((prev) => [...prev, `   [ERR] ${m} 执行失败: ${mErr.message || '未知错误'}`])
+              }
+            }
+          }
+          setDeployLogs((prev) => [...prev, '[SUCCESS] 数据库迁移任务执行完毕'])
+        }
+      } catch (dbGlobalErr: any) {
+        dbOperationSuccess = false
+        setDeployLogs((prev) => [...prev, `[WARNING] 数据库迁移步骤异常: ${dbGlobalErr.message || String(dbGlobalErr)}`])
+      }
+
+      setDeployProgress(100)
+      setDeployStatus('success')
+      setDeployLogs((prev) => [...prev, `[FINISH] 部署任务执行完毕${dbOperationSuccess ? '' : ' (注意: 数据库部分操作有失败，详见日志)'}`])
+
+      // 保存到本地历史
       const history = JSON.parse(localStorage.getItem('deploy_history') || '[]')
       const newEntry = {
         name: configFields.name,
         type: type,
-        url: deployedUrl,
-        d1Id: configFields.database_id,
+        url: deployedUrl || `https://${configFields.name}.workers.dev`,
+        d1Id: resources.d1Id,
         d1Name: configFields.database_name,
-        r2Name: configFields.bucket_name,
         timestamp: Date.now()
       }
       localStorage.setItem('deploy_history', JSON.stringify([newEntry, ...history]))
 
-    } catch (err: any) {
+    } catch (finalErr: any) {
+      console.error('Deployment Failure:', finalErr)
+      setDeployStatus('failure')
       setDeployLogs((prev) => [
         ...prev,
-        `[异常] ${err.message || String(err)}`,
-        `请访问帮助中心查看配置指南: ${HELP_URL}`
+        `[FATAL] 部署由于不可恢复错误而中断: ${finalErr.message || String(finalErr)}`,
+        `建议访问官方指南排查常见问题: ${HELP_URL}`
       ])
-      setDeployStatus('failure')
     }
   }
+
 
   const generateRandomString = (length: number): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -338,11 +368,11 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
         setProjectInfo(projects[0])
         // Initialize config fields
         await parseExistingConfig(projects[0].path, projects[0].config)
-        
+
         // Scan for migrations
         const migrations = await window.api.project.getMigrations(projects[0].path)
         setDetectedMigrations(migrations)
-        
+
         setStep(2)
       } else {
         setError('在选中目录中未找到相关的项目文件夹')
@@ -372,11 +402,11 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
       if (projects && projects.length > 0) {
         setProjectInfo(projects[0])
         await parseExistingConfig(projects[0].path, projects[0].config)
-        
+
         // Scan for migrations
         const migrations = await window.api.project.getMigrations(projects[0].path)
         setDetectedMigrations(migrations)
-        
+
         setStep(2)
       } else {
         setError('下载的项目无效')
@@ -573,7 +603,7 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
       {step === 2 && projectInfo && (
         <div className="space-y-8 animate-in fade-in slide-in-from-right-10 duration-500">
           <div className="text-center mb-10">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">第二步：项目{isUpdate ? '更新' : '配置'}确认</h2>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">第二步：项目确认</h2>
             <p className="mt-2 text-sm text-slate-500 font-medium">{isUpdate ? '请确认相关资源绑定，更新模式下配置不可更改' : '配置您的项目环境与资源绑定'}</p>
           </div>
 
@@ -646,31 +676,28 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-6">
-              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl space-y-6">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
-                  <CheckCircle2 size={14} className="text-emerald-500" />
-                  安全与敏感配置 {isUpdate && '(只读)'}
-                </h3>
+              {!isUpdate && (
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl space-y-6">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
+                    <ShieldCheck size={14} className="text-emerald-500" />
+                    安全与敏感配置
+                  </h3>
 
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                      后台验证码 (CAPTCHA)
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        disabled={isUpdate}
-                        value={configFields.CF_ADMIN_CAPTCHA}
-                        onChange={(e) =>
-                          setConfigFields({ ...configFields, CF_ADMIN_CAPTCHA: e.target.value })
-                        }
-                        className="flex-1 px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-mono font-bold focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
-                      />
-                      {!isUpdate && (
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                        后台验证码 (CAPTCHA)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={configFields.CF_ADMIN_CAPTCHA}
+                          onChange={(e) =>
+                            setConfigFields({ ...configFields, CF_ADMIN_CAPTCHA: e.target.value })
+                          }
+                          className="flex-1 px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-mono font-bold focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 transition-all"
+                        />
                         <button
                           onClick={() =>
                             setConfigFields({
@@ -682,25 +709,22 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                         >
                           <RefreshCw size={18} />
                         </button>
-                      )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                      JWT 密钥 (JWT_SECRET)
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="password"
-                        disabled={isUpdate}
-                        value={configFields.JWT_SECRET}
-                        onChange={(e) =>
-                          setConfigFields({ ...configFields, JWT_SECRET: e.target.value })
-                        }
-                        className="flex-1 px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-mono font-bold focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
-                      />
-                      {!isUpdate && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                        JWT 密钥 (JWT_SECRET)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={configFields.JWT_SECRET}
+                          onChange={(e) =>
+                            setConfigFields({ ...configFields, JWT_SECRET: e.target.value })
+                          }
+                          className="flex-1 px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-mono font-bold focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 transition-all"
+                        />
                         <button
                           onClick={() =>
                             setConfigFields({
@@ -712,49 +736,122 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                         >
                           <RefreshCw size={18} />
                         </button>
-                      )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              {isUpdate && detectedMigrations.length > 0 && (
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl space-y-6">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
+                    <Terminal size={14} className="text-primary" />
+                    数据库迁移解析
+                  </h3>
+
+                  <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar"
+                    style={{ maxHeight: "120px" }}
+                  >
+                    {detectedMigrations.map((m) => (
+                      <div key={m} className={`flex items-center gap-3 px-4 py-1 rounded-xl border transition-all group ${selectedMigrations.includes(m) ? 'bg-primary/5 border-primary/20 shadow-sm' : 'bg-slate-50/50 border-slate-100 hover:border-slate-200'
+                        }`}>
+                        <label className="flex items-center gap-3 cursor-pointer flex-1">
+                          <input
+                            type="checkbox"
+                            className="hidden"
+                            checked={selectedMigrations.includes(m)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedMigrations([...selectedMigrations, m])
+                              } else {
+                                setSelectedMigrations(selectedMigrations.filter(item => item !== m))
+                              }
+                            }}
+                          />
+                          <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors ${selectedMigrations.includes(m) ? 'bg-primary border-primary text-white' : 'bg-white border-slate-200 group-hover:border-slate-300'
+                            }`}>
+                            {selectedMigrations.includes(m) && <CheckCircle2 size={14} />}
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-xs font-black text-slate-700">{m}</div>
+                          </div>
+                        </label>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const content = await window.api.project.readFile(`${projectInfo.path}/${m}`)
+                              setPreviewContent(content)
+                              setPreviewingMigration(m)
+                            } catch (e) {
+                              setError('读取文件失败')
+                            }
+                          }}
+                          className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                          title="查看文件内容"
+                        >
+                          <FileText size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {previewingMigration && (
+                    <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <Terminal size={12} />
+                          Preview: {previewingMigration}
+                        </div>
+                        <button
+                          onClick={() => setPreviewingMigration(null)}
+                          className="text-[10px] font-bold text-primary hover:underline"
+                        >
+                          收起预览
+                        </button>
+                      </div>
+                      <div className="max-h-[200px] overflow-y-auto p-4 bg-slate-950 rounded-2xl text-[11px] font-mono text-emerald-400/90 leading-relaxed custom-scrollbar border border-slate-800 shadow-inner">
+                        <pre className="whitespace-pre-wrap">{previewContent}</pre>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t border-slate-50 flex items-center gap-4">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          className="peer sr-only"
+                          checked={updateSubSites}
+                          onChange={(e) => setUpdateSubSites(e.target.checked)}
+                        />
+                        <div className="w-10 h-6 bg-slate-200 rounded-full peer-checked:bg-primary transition-colors"></div>
+                        <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div>
+                      </div>
+                      <span className="text-xs font-bold text-slate-600 group-hover:text-primary transition-colors">
+                        是否执行子站数据库同步
+                      </span>
+                    </label>
+                    <div className="p-2 bg-amber-50 text-amber-500 rounded-lg shrink-0" title="勾选后将自动查询 sites 表并同步迁移">
+                      <AlertCircle size={14} />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-
-          {(isUpdate && detectedMigrations.length > 0) && (
-            <div className="p-6 bg-amber-50 rounded-[2rem] border border-amber-100 flex items-start gap-4 animate-in slide-in-from-bottom-4">
-              <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-amber-500 shrink-0">
-                <AlertCircle size={20} />
-              </div>
-              <div className="flex-1">
-                <h4 className="text-sm font-black text-amber-600 mb-1">数据库迁移提示</h4>
-                <p className="text-xs text-amber-700 font-medium leading-relaxed mb-2">
-                  检测到项目中包含 {detectedMigrations.length} 个新的迁移文件（不含 schema.sql）。代码更新完成后，系统将自动依次执行这些迁移脚本。
-                </p>
-                <div className="bg-white/50 p-3 rounded-xl space-y-1">
-                  {detectedMigrations.map((m, idx) => (
-                    <div key={idx} className="text-[10px] font-mono text-amber-800 flex items-center gap-2">
-                      <ChevronRight size={10} className="shrink-0" />
-                      {m}
-                    </div>
-                  ))}
+          {isUpdate && (
+            <div className="px-8 py-2 bg-indigo-50/50 rounded-[2.5rem] border border-indigo-100 flex flex-col gap-4">
+              <div className="flex items-center gap-4 text-indigo-600">
+                <div className="w-10 h-10 bg-white rounded-2xl shadow-sm flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={24} />
                 </div>
+                <h4 className="text-sm font-black uppercase tracking-tight">项目文件已解析。确认迁移文件及同步选项无误后，点击“立即更新部署”开始执行代码与数据库的热更新。</h4>
               </div>
             </div>
           )}
-
-          {(!isUpdate || (isUpdate && detectedMigrations.length === 0)) && (
-            <div className="p-6 bg-indigo-50/50 rounded-[2rem] border border-indigo-100/50 flex items-center gap-4">
-              <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
-                <CheckCircle2 size={20} />
-              </div>
-              <p className="text-[11px] text-indigo-900/60 font-medium leading-relaxed">
-                {isUpdate 
-                  ? '已检测项目文件，配置文件已锁定。点击下方按钮开始更新代码。' 
-                  : '系统将自动在您的 Cloudflare 账户中创建或复用资源。若有疑问，请访查帮助中心。'}
-              </p>
-            </div>
-          )}
-          <div className="flex items-center justify-center gap-6">
+          <div className="flex items-center justify-center gap-6 pt-4">
             <button
               onClick={() => setStep(1)}
               className="px-10 py-5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 active:scale-95 transition-all"
@@ -804,6 +901,14 @@ JWT_SECRET = "${configFields.JWT_SECRET}"
                   </span>
                 </div>
               )}
+            </div>
+
+            {/* Progress Bar */}
+            <div className="h-1 bg-slate-800 w-full overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]"
+                style={{ width: `${deployProgress}%` }}
+              />
             </div>
 
             <div ref={consoleRef} className="p-8 h-[350px] overflow-y-auto font-mono text-xs space-y-2 custom-scrollbar scroll-smooth">
