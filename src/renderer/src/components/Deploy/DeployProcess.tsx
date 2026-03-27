@@ -236,7 +236,7 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
       if (!isUpdate) {
         setDeployLogs((prev) => [...prev, '正在初始化应用环境变量 (Secrets)...'])
         setDeployProgress(80)
-        
+
         // 增加短暂延迟，确保 Cloudflare 管理面已同步新脚本
         setDeployLogs((prev) => [...prev, '[INFO] 等待 Cloudflare 网络同步 (2s)...'])
         await new Promise(resolve => setTimeout(resolve, 2000))
@@ -646,9 +646,9 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
             <p className="mt-2 text-sm text-slate-500 font-medium">{isUpdate ? '请确认相关资源绑定，更新模式下配置不可更改' : '配置您的项目环境与资源绑定'}</p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl space-y-6">
+          <div className={isUpdate ? "grid grid-cols-1 lg:grid-cols-2 gap-8" : "grid grid-cols-1 gap-8"}>
+            <div className={!isUpdate ? "space-y-6 flex gap-6" : "space-y-6"}>
+              <div className={`bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl space-y-6 ${!isUpdate ? 'flex-1' : ''}`}>
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
                   <FileText size={14} className="text-primary" />
                   基础项目信息 {isUpdate && '(只读)'}
@@ -717,7 +717,7 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
               </div>
 
               {!isUpdate && (
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl space-y-6">
+                <div className="flex-1 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl space-y-6">
                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
                     <ShieldCheck size={14} className="text-emerald-500" />
                     安全与敏感配置
@@ -782,7 +782,7 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
               )}
             </div>
 
-            <div className="space-y-6">
+            <div style={{ display: isUpdate ? "block" : "none" }} className="space-y-6">
               {isUpdate && detectedMigrations.length > 0 && (
                 <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl space-y-6">
                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
@@ -879,6 +879,7 @@ const DeployProcess: React.FC<DeployProcessProps> = ({ onBack, type, isUpdate, u
                 </div>
               )}
             </div>
+
           </div>
           {isUpdate && (
             <div className="px-8 py-2 bg-indigo-50/50 rounded-[2.5rem] border border-indigo-100 flex flex-col gap-4">
